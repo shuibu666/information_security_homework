@@ -1,24 +1,28 @@
 # information_security_homework
 
-This repository contains the code and documents needed to reproduce our Information Security course project based on:
+本仓库用于复现《信息安全技术》课程项目，主题为：
 
-- Paper: `A Watermark for Large Language Models`
-- Official codebase: `jwkirchenbauer/lm-watermarking`
+- 论文：`A Watermark for Large Language Models`
+- 官方仓库：`jwkirchenbauer/lm-watermarking`
 
-It includes:
+仓库内容包括：
 
-- the original baseline watermark implementation needed for reproduction
-- our adaptive-delta improvement under `course_project/`
-- scripts for batch experiments, analysis, and the presentation frontend
+- 原始论文复现所需的基础代码
+- 我们实现的自适应 `delta` 改进方案
+- 批量实验脚本
+- 结果分析脚本
+- 用于演示的前端脚本
 
-It does not include:
+本仓库不包含：
 
-- local downloaded models under `models/`
-- local cache files
-- course report files
-- the course requirement PDF
+- 本地下载的大模型文件
+- 本地缓存文件
+- 实验报告 `.md` 和 `.pdf`
+- 课程要求 PDF
 
-## Quick Start
+## 1. 环境准备
+
+建议使用 `conda` 创建独立环境：
 
 ```bash
 conda create -n inform python=3.10 -y
@@ -26,18 +30,20 @@ conda activate inform
 pip install -r requirements.txt
 ```
 
-Put your local models under:
+## 2. 模型准备
+
+请将本地模型放到：
 
 ```text
 models/
 ```
 
-Recommended:
+推荐使用：
 
 - `./models/tiny-gpt2`
 - `./models/opt-125m`
 
-## Run the Original Demo
+## 3. 运行官方复现 Demo
 
 ```bash
 python demo_watermark.py \
@@ -47,7 +53,7 @@ python demo_watermark.py \
   --max_new_tokens 100
 ```
 
-## Run the Improved Demo
+## 4. 运行改进版前端
 
 ```bash
 python course_project/scripts/demo_adaptive.py \
@@ -59,7 +65,13 @@ python course_project/scripts/demo_adaptive.py \
   --adaptive_delta_max 3.0
 ```
 
-## Run Batch Experiments
+该前端支持同时对比：
+
+- `No Watermark`
+- `Fixed Delta`
+- `Adaptive Delta`
+
+## 5. 运行批量实验
 
 ```bash
 python course_project/scripts/run_experiments.py \
@@ -73,7 +85,7 @@ python course_project/scripts/run_experiments.py \
   --adaptive_delta_max 3.0
 ```
 
-## Analyze Results
+## 6. 分析实验结果
 
 ```bash
 python course_project/scripts/analyze_results.py \
@@ -83,92 +95,32 @@ python course_project/scripts/analyze_results.py \
   --green_chart course_project/outputs/green_fraction_comparison.png
 ```
 
-More detailed instructions are available in:
+## 7. 目录说明
+
+```text
+information_security_homework/
+├── demo_watermark.py
+├── watermark_processor.py
+├── requirements.txt
+├── models/
+└── course_project/
+    ├── data/
+    │   └── prompts.txt
+    ├── docs/
+    │   └── README_SUBMISSION.md
+    ├── outputs/
+    ├── processors/
+    │   └── adaptive_watermark_processor.py
+    └── scripts/
+        ├── run_experiments.py
+        ├── analyze_results.py
+        └── demo_adaptive.py
+```
+
+## 8. 说明
+
+更详细的运行说明请参考：
 
 ```text
 course_project/docs/README_SUBMISSION.md
 ```
-
-As a quickstart, the app can be launched with default args (or deployed to a [huggingface Space](https://huggingface.co/spaces)) using `app.py`
-which is just a thin wrapper around the demo script.
-```sh
-python app.py
-gradio app.py # for hot reloading
-# or
-python demo_watermark.py --model_name_or_path facebook/opt-6.7b
-```
-
-
-### How to Watermark - A short guide on watermark hyperparameters
-What watermark hyperparameters are optimal for your task or for a comparison to new watermarks? We'll provide a brief overview about all important settings below, and best practices for future work. This guide represents our current understanding of optimal settings as of August 2023, and so is a bit more up to date than our ICML 2023 conference paper.
-
-**TL;DR**: As a baseline generation setting, we suggest default values of `gamma=0.25` and `delta=2.0`. Reduce delta if text quality is negatively impacted. For the context width, h, we recommend a moderate value, i.e. h=4, and as a default PRF we recommend `selfhash`, but can use `minhash` if you want. Reduce h if more robustness against edits is required. Note however that the choice of PRF only matters if h>1. The recommended PRF and context width can be easily selected by instantiating the watermark processor and detector with `seeding_scheme="selfhash"` (a shorthand for `seeding_scheme="ff-anchored_minhash_prf-4-True-15485863"`, but do use a different base key if actually deploying). For detection, always run with `--ignore--repeated-ngrams=True`.
-
-1) **Logit bias delta**: The magnitude of delta determines the strength of the watermark. A sufficiently large value of delta recovers a "hard" watermark that encodes 1 bit of information at every token, but this is not an advisable setting, as it strongly affects model quality. A moderate delta in the range of [0.5, 2.0] is appropriate for normal use cases, but the strength of delta is relative to the entropy of the output distribution. Models that are overconfident, such as instruction-tuned models, may benefit from choosing a larger delta value. With non-infinite delta values, the watermark strength is directly proportional to the (spike) entropy of the text and exp(delta) (see Theorem 4.2 in our paper).
-
-2) **Context width h**: Context width is the length of the context which is taken into account when seeding the watermark at each location. The longer the context, the "more random" the red/green list partitions are, and the less detectable the watermark is. For private watermarks, this implies that the watermark is harder to discover via brute-force (with an exponential increase in hardness with increasing context width h).
-In the limit of a very long context width, we approach the "undetectable" setting of https://eprint.iacr.org/2023/763. However, the longer the context width, the less "nuclear" the watermark is, and robustness to paraphrasing and other attacks decreases. In the limit of h=0, the watermark is independent of local context and, as such, it is minimally random, but maximally robust against edits (see https://arxiv.org/abs/2306.17439).
-
-3) **Ignoring repeated ngrams**: The watermark is only pseudo-random based on the local context. Whenever local context repeats, this constitutes a violation of the assumption that the PRNG numbers used to seed the green/red partition operation are drawn iid. (See Sec.4. in our paper for details). For this reason, p-values for text with repeated n-grams (n-gram here meaning context + chosen token) will be misleading. As such, detection should be run with `--ignore-repeated-ngrams` set to `True`. An additional, detailed analysis of this effect can be found in http://arxiv.org/abs/2308.00113.
-
-4) **Choice of pseudo-random-function** (PRF): This choice is only relevant if context width h>1 and determines the robustness of the hash of the context against edits. In our experiments we find "min"-hash PRFs to be the most performant in striking a balance between maximizing robustness and minimizing impact on text quality. In comparison to a PRF that depends on the entire context, this PRF only depends on a single, randomly chosen token from the context.
-
-5) **Self-Hashing**: It is possible to extend the context width of the watermark onto the current token. This effectively extends the context width "for-free" by one. The only downside is that this approach requires hashing all possible next tokens, and applying the logit bias only to tokens where their inclusion in the context would produce a hash that includes this token on the green list. This is slow in the way we implement it, because we use cuda's pseudorandom number generator and a simple inner-loop implementation, but in principle has a negligible cost, compared to generating new tokens if engineered for deployment. A generalized algorithm for self-hashing can be found as Alg.1 in http://arxiv.org/abs/2306.04634.
-
-6) **Gamma**: Gamma denotes the fraction of the vocabulary that will be in each green list. We find gamma=0.25 to be slightly more optimal empirically, but this is a minor effect and reasonable values of gamma between 0.25 and 0.75 will lead to reasonable watermark. A intuitive argument can be made for why this makes it easier to achieve a fraction of green tokens sufficiently higher than gamma to reject the null hypothesis, when you choose a lower gamma value.
-
-7) **Base Key**: Our watermark is salted with a small base key of 15485863 (the millionth prime). If you deploy this watermark, we do not advise re-using this key.
-
-### How to use the watermark in your own code.
-
-Our implementation can be added into any huggingface generation pipeline as an additional `LogitProcessor`, only the classes `WatermarkLogitsProcessor` and `WatermarkDetector` from the `extended_watermark_processor.py` file are required.
-
-Example snippet to generate watermarked text:
-```python
-
-from extended_watermark_processor import WatermarkLogitsProcessor
-
-watermark_processor = WatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
-                                               gamma=0.25,
-                                               delta=2.0,
-                                               seeding_scheme="selfhash") #equivalent to `ff-anchored_minhash_prf-4-True-15485863`
-# Note:
-# You can turn off self-hashing by setting the seeding scheme to `minhash`.
-
-tokenized_input = tokenizer(input_text, return_tensors='pt').to(model.device)
-# note that if the model is on cuda, then the input is on cuda
-# and thus the watermarking rng is cuda-based.
-# This is a different generator than the cpu-based rng in pytorch!
-
-output_tokens = model.generate(**tokenized_input,
-                               logits_processor=LogitsProcessorList([watermark_processor]))
-
-# if decoder only model, then we need to isolate the
-# newly generated tokens as only those are watermarked, the input/prompt is not
-output_tokens = output_tokens[:,tokenized_input["input_ids"].shape[-1]:]
-
-output_text = tokenizer.batch_decode(output_tokens, skip_special_tokens=True)[0]
-```
-
-Example snippet to detect watermarked text:
-```python
-
-from extended_watermark_processor import WatermarkDetector
-
-watermark_detector = WatermarkDetector(vocab=list(tokenizer.get_vocab().values()),
-                                        gamma=0.25, # should match original setting
-                                        seeding_scheme="selfhash", # should match original setting
-                                        device=model.device, # must match the original rng device type
-                                        tokenizer=tokenizer,
-                                        z_threshold=4.0,
-                                        normalizers=[],
-                                        ignore_repeated_ngrams=True)
-
-score_dict = watermark_detector.detect(output_text) # or any other text of interest to analyze
-```
-
-To recover the main settings of the experiments in the original work (for historical reasons), use the seeding scheme `simple_1` and set `ignore_repeated_ngrams=False` at detection time.
-
-
-### Contributing
-Suggestions and PR's welcome 🙂
