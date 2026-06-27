@@ -1,0 +1,140 @@
+﻿# Reproduction and Submission Guide
+
+This repository is organized for coursework submission:
+
+- Root directory: official `lm-watermarking` code and your baseline reproduction environment.
+- `course_project/`: all coursework-specific improvement code, prompts, outputs, and documentation.
+
+## 1. Recommended directory view
+
+```text
+lm-watermarking-adaptive/
+├── demo_watermark.py
+├── watermark_processor.py
+├── models/
+├── course_project/
+│   ├── data/
+│   │   └── prompts.txt
+│   ├── docs/
+│   │   └── README_SUBMISSION.md
+│   ├── outputs/
+│   ├── processors/
+│   │   └── adaptive_watermark_processor.py
+│   └── scripts/
+│       ├── run_experiments.py
+│       └── analyze_results.py
+└── requirements.txt
+```
+
+## 2. Create and activate the environment
+
+```bash
+conda create -n inform python=3.10 -y
+conda activate inform
+```
+
+## 3. Install dependencies
+
+Run this from the repository root:
+
+```bash
+pip install -r requirements.txt
+```
+
+## 4. Prepare local models
+
+Store local models in:
+
+```text
+models/
+```
+
+Recommended:
+
+- `./models/tiny-gpt2` for smoke tests
+- `./models/opt-125m` for course experiments
+
+## 5. Run the official baseline demo
+
+```bash
+python demo_watermark.py \
+  --model_name_or_path ./models/tiny-gpt2 \
+  --use_gpu True \
+  --run_gradio True \
+  --max_new_tokens 100
+```
+
+## 6. Run the improved batch experiments
+
+```bash
+python course_project/scripts/run_experiments.py \
+  --model_name_or_path ./models/opt-125m \
+  --prompts_path course_project/data/prompts.txt \
+  --output_csv course_project/outputs/results.csv \\
+  --max_new_tokens 100 \
+  --use_gpu True \
+  --fixed_deltas 0.5 1.0 2.0 3.0 \
+  --adaptive_delta_min 0.5 \
+  --adaptive_delta_max 3.0
+```
+
+Quick smoke test:
+
+```bash
+python course_project/scripts/run_experiments.py \
+  --model_name_or_path ./models/tiny-gpt2 \
+  --prompts_path course_project/data/prompts.txt \
+  --output_csv course_project/outputs/smoke_results.csv \\
+  --max_new_tokens 20 \
+  --use_gpu False \
+  --fixed_deltas 0.5 2.0 \
+  --adaptive_delta_min 0.5 \
+  --adaptive_delta_max 3.0 \
+  --limit_prompts 2
+```
+
+## 7. Run the presentation frontend
+
+```bash
+python course_project/scripts/demo_adaptive.py \
+  --model_name_or_path ./models/opt-125m \
+  --use_gpu True \
+  --max_new_tokens 120 \
+  --delta 2.0 \
+  --adaptive_delta_min 0.5 \
+  --adaptive_delta_max 3.0
+```
+
+This page keeps the official demo's overall interaction pattern, but adds:
+
+- side-by-side comparison of `No Watermark`, `Fixed Delta`, and `Adaptive Delta`
+- a summary table for video presentation
+- adaptive delta statistics for the generated sample
+- prompt presets loaded from `course_project/data/prompts.txt`
+
+## 8. Analyze experiment results
+
+```bash
+python course_project/scripts/analyze_results.py \
+  --input_csv course_project/outputs/results.csv \\
+  --summary_md course_project/outputs/summary.md \
+  --zscore_chart course_project/outputs/zscore_comparison.png \
+  --green_chart course_project/outputs/green_fraction_comparison.png
+```
+
+## 9. Coursework improvement summary
+
+The main improvement is an entropy-based adaptive watermark bias:
+
+```text
+delta_t = delta_min + (delta_max - delta_min) * H_norm
+```
+
+Where:
+
+- `H_norm` is the normalized entropy of the next-token probability distribution.
+- Higher entropy means the model is more uncertain, so the watermark bias becomes stronger.
+- Lower entropy means the model is more certain, so the watermark bias becomes weaker.
+
+This keeps the official greenlist sampling logic unchanged and only replaces the fixed bias with a dynamic bias.
+

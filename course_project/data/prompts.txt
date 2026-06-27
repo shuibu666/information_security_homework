@@ -1,0 +1,12 @@
+Explain how digital watermarking can support responsible use of large language models in education.
+Write a short overview of the main cybersecurity risks faced by small businesses adopting cloud services.
+Describe three practical ways universities can teach students to identify phishing emails.
+Summarize the relationship between artificial intelligence governance and data privacy regulation.
+Discuss how network segmentation improves resilience against ransomware attacks.
+Write a concise introduction to the role of cryptography in modern messaging applications.
+Explain why transparent AI system auditing matters for public sector deployment.
+Provide a short comparison between biometric authentication and password-based authentication.
+Describe the security benefits and trade-offs of multi-factor authentication for remote workers.
+Write a paragraph about how machine learning can help detect anomalous network traffic.
+Explain the importance of security awareness training in preventing social engineering attacks.
+Discuss how content authenticity tools could reduce misinformation in online platforms.

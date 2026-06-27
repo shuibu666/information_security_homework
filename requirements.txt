@@ -1,0 +1,8 @@
+gradio
+matplotlib
+nltk
+pandas
+scipy
+torch
+transformers
+tokenizers
