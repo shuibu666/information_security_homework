@@ -1,4 +1,4 @@
-﻿# Reproduction and Submission Guide
+# Reproduction and Submission Guide
 
 This repository is organized for coursework submission:
 
@@ -14,13 +14,15 @@ lm-watermarking-adaptive/
 ├── models/
 ├── course_project/
 │   ├── data/
-│   │   └── prompts.txt
+│   │   ├── prompts.txt
+│   │   └── prompts_c4_realnewslike_500.txt
 │   ├── docs/
 │   │   └── README_SUBMISSION.md
 │   ├── outputs/
 │   ├── processors/
 │   │   └── adaptive_watermark_processor.py
 │   └── scripts/
+│       ├── prepare_c4_prompts.py
 │       ├── run_experiments.py
 │       └── analyze_results.py
 └── requirements.txt
@@ -53,6 +55,8 @@ Recommended:
 
 - `./models/tiny-gpt2` for smoke tests
 - `./models/opt-125m` for course experiments
+- `course_project/data/prompts.txt` remains the small manual demo prompt set
+- `course_project/data/prompts_c4_realnewslike_500.txt` is the exported 500-sample subset used for formal experiments
 
 ## 5. Run the official baseline demo
 
@@ -64,13 +68,31 @@ python demo_watermark.py \
   --max_new_tokens 100
 ```
 
-## 6. Run the improved batch experiments
+## 6. Prepare the C4/realnewslike 500-sample subset
+
+This follows the paper-style data source more closely than the old 12 manual prompts:
+
+```bash
+python course_project/scripts/prepare_c4_prompts.py \
+  --model_name_or_path ./models/opt-125m \
+  --prompt_source hf_dataset \
+  --dataset_name c4 \
+  --dataset_config_name realnewslike \
+  --limit_prompts 500 \
+  --min_prompt_tokens 50 \
+  --max_new_tokens 100 \
+  --save_loaded_prompts_path course_project/data/prompts_c4_realnewslike_500.txt
+```
+
+## 7. Run the improved batch experiments
 
 ```bash
 python course_project/scripts/run_experiments.py \
   --model_name_or_path ./models/opt-125m \
-  --prompts_path course_project/data/prompts.txt \
-  --output_csv course_project/outputs/results.csv \\
+  --prompt_source prompts_file \
+  --prompts_path course_project/data/prompts_c4_realnewslike_500.txt \
+  --limit_prompts 500 \
+  --output_csv course_project/outputs/results.csv \
   --max_new_tokens 100 \
   --use_gpu True \
   --fixed_deltas 0.5 1.0 2.0 3.0 \
@@ -83,8 +105,9 @@ Quick smoke test:
 ```bash
 python course_project/scripts/run_experiments.py \
   --model_name_or_path ./models/tiny-gpt2 \
+  --prompt_source prompts_file \
   --prompts_path course_project/data/prompts.txt \
-  --output_csv course_project/outputs/smoke_results.csv \\
+  --output_csv course_project/outputs/smoke_results.csv \
   --max_new_tokens 20 \
   --use_gpu False \
   --fixed_deltas 0.5 2.0 \
@@ -93,7 +116,7 @@ python course_project/scripts/run_experiments.py \
   --limit_prompts 2
 ```
 
-## 7. Run the presentation frontend
+## 8. Run the presentation frontend
 
 ```bash
 python course_project/scripts/demo_adaptive.py \
@@ -110,13 +133,13 @@ This page keeps the official demo's overall interaction pattern, but adds:
 - side-by-side comparison of `No Watermark`, `Fixed Delta`, and `Adaptive Delta`
 - a summary table for video presentation
 - adaptive delta statistics for the generated sample
-- prompt presets loaded from `course_project/data/prompts.txt`
+- prompt presets loaded from `course_project/data/prompts.txt` for easier demo narration
 
-## 8. Analyze experiment results
+## 9. Analyze experiment results
 
 ```bash
 python course_project/scripts/analyze_results.py \
-  --input_csv course_project/outputs/results.csv \\
+  --input_csv course_project/outputs/results.csv \
   --summary_md course_project/outputs/summary.md \
   --zscore_chart course_project/outputs/zscore_comparison.png \
   --green_chart course_project/outputs/green_fraction_comparison.png
@@ -137,4 +160,3 @@ Where:
 - Lower entropy means the model is more certain, so the watermark bias becomes weaker.
 
 This keeps the official greenlist sampling logic unchanged and only replaces the fixed bias with a dynamic bias.
-

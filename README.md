@@ -9,6 +9,7 @@
 
 - 原始论文复现所需的基础代码
 - 我们实现的自适应 `delta` 改进方案
+- 基于 `C4/realnewslike` 500 条样本的正式实验数据
 - 批量实验脚本
 - 结果分析脚本
 - 用于演示的前端脚本
@@ -42,6 +43,7 @@ models/
 
 - `./models/tiny-gpt2`
 - `./models/opt-125m`
+- `./models/opt-2.7b`
 
 ## 3. 运行官方复现 Demo
 
@@ -74,9 +76,24 @@ python course_project/scripts/demo_adaptive.py \
 ## 5. 运行批量实验
 
 ```bash
+python course_project/scripts/prepare_c4_prompts.py \
+  --model_name_or_path ./models/opt-125m \
+  --prompt_source hf_dataset \
+  --dataset_name c4 \
+  --dataset_config_name realnewslike \
+  --limit_prompts 500 \
+  --min_prompt_tokens 50 \
+  --max_new_tokens 100 \
+  --save_loaded_prompts_path course_project/data/prompts_c4_realnewslike_500.txt
+```
+
+然后运行正式实验：
+
+```bash
 python course_project/scripts/run_experiments.py \
   --model_name_or_path ./models/opt-125m \
-  --prompts_path course_project/data/prompts.txt \
+  --prompt_source prompts_file \
+  --prompts_path course_project/data/prompts_c4_realnewslike_500.txt \
   --output_csv course_project/outputs/results.csv \
   --max_new_tokens 100 \
   --use_gpu True \
@@ -105,16 +122,20 @@ information_security_homework/
 ├── models/
 └── course_project/
     ├── data/
-    │   └── prompts.txt
+    │   ├── prompts.txt
+    │   └── prompts_c4_realnewslike_500.txt
     ├── docs/
     │   └── README_SUBMISSION.md
     ├── outputs/
     ├── processors/
     │   └── adaptive_watermark_processor.py
+    ├── prompt_utils.py
     └── scripts/
+        ├── prepare_c4_prompts.py
         ├── run_experiments.py
         ├── analyze_results.py
-        └── demo_adaptive.py
+        ├── demo_adaptive.py
+        └── run_opt27b_remote.sh
 ```
 
 ## 8. 说明

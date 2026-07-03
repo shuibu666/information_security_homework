@@ -19,25 +19,29 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from course_project.prompt_utils import load_prompts, str2bool
 from course_project.processors.adaptive_watermark_processor import AdaptiveDeltaWatermarkLogitsProcessor
 from watermark_processor import WatermarkDetector, WatermarkLogitsProcessor
-
-
-def str2bool(value):
-    if isinstance(value, bool):
-        return value
-    lowered = value.lower()
-    if lowered in {"yes", "true", "t", "y", "1"}:
-        return True
-    if lowered in {"no", "false", "f", "n", "0"}:
-        return False
-    raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run baseline and adaptive watermark experiments.")
     parser.add_argument("--model_name_or_path", type=str, default="./models/opt-125m")
+    parser.add_argument("--prompt_source", type=str, choices=["prompts_file", "hf_dataset"], default="hf_dataset")
     parser.add_argument("--prompts_path", type=str, default="course_project/data/prompts.txt")
+    parser.add_argument("--save_loaded_prompts_path", type=str, default="course_project/data/prompts_c4_realnewslike_500.txt")
+    parser.add_argument("--dataset_name", type=str, default="c4")
+    parser.add_argument("--dataset_config_name", type=str, default="realnewslike")
+    parser.add_argument("--dataset_split", type=str, default="train")
+    parser.add_argument("--dataset_text_field", type=str, default="text")
+    parser.add_argument("--dataset_streaming", type=str2bool, default=True)
+    parser.add_argument("--trust_remote_code", type=str2bool, default=True)
+    parser.add_argument("--shuffle_dataset", type=str2bool, default=False)
+    parser.add_argument("--dataset_seed", type=int, default=1234)
+    parser.add_argument("--shuffle_buffer_size", type=int, default=10_000)
+    parser.add_argument("--dataset_skip_examples", type=int, default=0)
+    parser.add_argument("--min_prompt_tokens", type=int, default=50)
+    parser.add_argument("--min_source_tokens", type=int, default=None)
     parser.add_argument("--output_csv", type=str, default="course_project/outputs/results.csv")
     parser.add_argument("--prompt_max_length", type=int, default=None)
     parser.add_argument("--max_new_tokens", type=int, default=100)
@@ -57,7 +61,9 @@ def parse_args():
     parser.add_argument("--fixed_deltas", nargs="+", type=float, default=[0.5, 1.0, 2.0, 3.0])
     parser.add_argument("--adaptive_delta_min", type=float, default=0.5)
     parser.add_argument("--adaptive_delta_max", type=float, default=3.0)
-    parser.add_argument("--limit_prompts", type=int, default=None)
+    parser.add_argument("--adaptive_entropy_floor", type=float, default=0.20)
+    parser.add_argument("--adaptive_delta_exponent", type=float, default=0.5)
+    parser.add_argument("--limit_prompts", type=int, default=500)
     return parser.parse_args()
 
 
@@ -94,19 +100,6 @@ def load_model_and_tokenizer(args):
     if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
         tokenizer.pad_token = tokenizer.eos_token
     return model, tokenizer, device, is_decoder_only
-
-
-def read_prompts(prompts_path: str, limit_prompts: int | None) -> list[str]:
-    prompts = []
-    for raw_line in Path(prompts_path).read_text(encoding="utf-8").splitlines():
-        prompt = raw_line.strip()
-        if prompt and not prompt.startswith("#"):
-            prompts.append(prompt)
-    if limit_prompts is not None:
-        prompts = prompts[:limit_prompts]
-    if not prompts:
-        raise ValueError("No prompts were loaded from the prompts file.")
-    return prompts
 
 
 def resolve_prompt_max_length(args, model) -> int:
@@ -279,7 +272,7 @@ def write_results(rows, output_csv: str):
 def main():
     args = parse_args()
     model, tokenizer, device, is_decoder_only = load_model_and_tokenizer(args)
-    prompts = read_prompts(args.prompts_path, args.limit_prompts)
+    prompts = load_prompts(args, tokenizer)
     vocab_ids = list(tokenizer.get_vocab().values())
     detector = build_detector(args, tokenizer, device, vocab_ids)
 
@@ -343,6 +336,8 @@ def main():
             delta=args.adaptive_delta_max,
             delta_min=args.adaptive_delta_min,
             delta_max=args.adaptive_delta_max,
+            entropy_floor=args.adaptive_entropy_floor,
+            delta_exponent=args.adaptive_delta_exponent,
             seeding_scheme=args.seeding_scheme,
             select_green_tokens=args.select_green_tokens,
         )
