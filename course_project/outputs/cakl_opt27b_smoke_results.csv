@@ -1,0 +1,36 @@
+﻿prompt_id,method,delta,delta_min,delta_max,prompt,generated_text,tokens_counted,num_green_tokens,green_fraction,z_score,p_value,prediction,confidence,word_count,distinct_1,distinct_2,repetition_rate,avg_step_delta,observed_delta_min,observed_delta_max,weighted_z_score,winmax_weighted_z_score,weighted_p_value,weighted_prediction,weighted_confidence,avg_kl,avg_delta,avg_entropy,avg_p_green_mass,gate_pass_rate,avg_candidate_size,candidate_top_p,kl_epsilon
+1,No Watermark,,,,Explain how digital watermarking can support responsible use of large language models in education.,"
+
+Introduction
+
+In this topic, we",9,1,0.1111111111111111,-0.9622504486493763,0.8320380934241322,Human/Unwatermarked,0.0,5,1.0,1.0,0.0,,,,-0.5600604681980176,0.0,0.7122809032260841,False,0.0,,,0.24275891479779071,0.293017578125,0.2,346.6,,
+1,Fixed Delta 1.0,1.0,,,Explain how digital watermarking can support responsible use of large language models in education.,"
+
+Introduction
+
+In this topic we will",9,2,0.2222222222222222,-0.19245008972987526,0.5763051701566428,Human/Unwatermarked,0.0,6,1.0,1.0,0.0,1.0,1.0,1.0,-0.5600604681980176,0.0,0.7122809032260841,False,0.0,,,0.25497376719698833,0.2423095703125,0.2,351.4,,
+1,Current Adaptive Delta,adaptive,0.5,3.0,Explain how digital watermarking can support responsible use of large language models in education.,"
+
+Introduction
+
+In this topic we propose",9,3,0.3333333333333333,0.5773502691896257,0.28185143082538655,Human/Unwatermarked,0.0,6,1.0,1.0,0.0,1.8404956579208374,1.6180340051651,2.362638473510742,-0.5600604681980176,0.0,0.7122809032260841,False,0.0,,,0.25497376719698833,0.2423095703125,0.2,351.4,,
+1,CA-KL,kl_adaptive,,3.0,Explain how digital watermarking can support responsible use of large language models in education.,"
+
+Introduction
+
+In this topic, we",9,1,0.1111111111111111,-0.9622504486493763,0.8320380934241322,Human/Unwatermarked,0.0,5,1.0,1.0,0.0,,,,,,,,,0.019998665815583225,0.810552978515625,0.2431746840464072,0.1414233584422618,1.0,50265.0,,0.02
+1,CA-KL + Weighted Detector,kl_adaptive,,3.0,Explain how digital watermarking can support responsible use of large language models in education.,"
+
+Introduction
+
+In this topic, we",9,1,0.1111111111111111,-0.9622504486493763,0.8320380934241322,Human/Unwatermarked,0.0,5,1.0,1.0,0.0,,,,-0.3066915163900779,0.0,0.6204609061281974,False,0.0,0.019998665815583225,0.810552978515625,0.24275891479779071,0.14104995727539063,1.0,50265.0,,0.02
+1,CA-KL + Candidate Greenlist,kl_adaptive,,3.0,Explain how digital watermarking can support responsible use of large language models in education.,"
+
+Introduction
+
+In this topic, we",9,1,0.1111111111111111,-0.9622504486493763,0.8320380934241322,Human/Unwatermarked,0.0,5,1.0,1.0,0.0,,,,-0.5600604681980176,0.0,0.7122809032260841,False,0.0,0.019998077725798535,0.7504806518554688,0.24275891479779071,0.293017578125,0.2,346.6,0.95,0.02
+1,CA-KL + Candidate Greenlist + Weighted/WinMax,kl_adaptive,,3.0,Explain how digital watermarking can support responsible use of large language models in education.,"
+
+Introduction
+
+In this topic, we",9,1,0.1111111111111111,-0.9622504486493763,0.8320380934241322,Human/Unwatermarked,0.0,5,1.0,1.0,0.0,,,,-0.5600604681980176,0.0,0.7122809032260841,False,0.0,0.003999227482218927,0.10351409912109374,0.24275891479779071,0.293017578125,0.2,346.6,0.95,0.02

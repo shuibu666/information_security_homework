@@ -160,3 +160,63 @@ Where:
 - Lower entropy means the model is more certain, so the watermark bias becomes weaker.
 
 This keeps the official greenlist sampling logic unchanged and only replaces the fixed bias with a dynamic bias.
+
+## 10. CA-KL-CG final experiment workflow
+
+The final course-project method is `CA-KL-CG Watermark`, an inference-time watermark that combines:
+
+- KL-constrained adaptive `delta`
+- confidence gating with normalized entropy and top-1 probability
+- candidate-aware greenlists over top-p tokens
+- model-assisted weighted and windowed detection
+
+Recommended formal run:
+
+```bash
+python course_project/scripts/run_experiments.py \
+  --model_name_or_path ./models/opt-2.7b \
+  --prompt_source prompts_file \
+  --prompts_path course_project/data/prompts_c4_realnewslike_500.txt \
+  --limit_prompts 500 \
+  --output_csv course_project/outputs/cakl_cg_opt27b_c4_500_results.csv \
+  --max_new_tokens 100 \
+  --use_gpu True \
+  --fixed_deltas 1.0 2.0 3.0 \
+  --run_cakl True \
+  --kl_epsilon 0.50 \
+  --cakl_delta_max 3.0 \
+  --confidence_entropy_threshold 0.35 \
+  --confidence_top1_threshold 0.85 \
+  --candidate_top_p 0.95 \
+  --window_sizes 20,40,80,max \
+  --use_model_assisted_detector True
+```
+
+Summarize the final results:
+
+```bash
+python course_project/scripts/analyze_results.py \
+  --input_csv course_project/outputs/cakl_cg_opt27b_c4_500_results.csv \
+  --summary_md course_project/outputs/cakl_cg_opt27b_c4_500_summary.md \
+  --zscore_chart course_project/outputs/cakl_cg_zscore.png \
+  --green_chart course_project/outputs/cakl_cg_green.png \
+  --tradeoff_chart course_project/outputs/cakl_cg_tradeoff.png \
+  --weighted_auc_chart course_project/outputs/cakl_cg_weighted_auc.png \
+  --kl_delta_chart course_project/outputs/cakl_cg_kl_delta.png
+```
+
+Quick smoke test:
+
+```bash
+python course_project/scripts/run_experiments.py \
+  --model_name_or_path ./models/tiny-gpt2 \
+  --prompt_source prompts_file \
+  --prompts_path course_project/data/prompts.txt \
+  --output_csv course_project/outputs/cakl_smoke_results.csv \
+  --max_new_tokens 20 \
+  --use_gpu False \
+  --fixed_deltas 1.0 2.0 \
+  --limit_prompts 2 \
+  --run_cakl True \
+  --use_model_assisted_detector True
+```

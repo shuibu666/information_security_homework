@@ -1,4 +1,6 @@
 gradio
+huggingface_hub
+datasets
 matplotlib
 nltk
 pandas

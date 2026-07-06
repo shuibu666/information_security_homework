@@ -44,4 +44,12 @@ CUDA_VISIBLE_DEVICES=7 "$PYTHON_BIN" -u course_project/scripts/run_experiments.p
   --use_gpu True \
   --fixed_deltas 0.5 1.0 2.0 3.0 \
   --adaptive_delta_min 0.5 \
-  --adaptive_delta_max 3.0
+  --adaptive_delta_max 3.0 \
+  --run_cakl True \
+  --kl_epsilon 0.02 \
+  --cakl_delta_max 3.0 \
+  --confidence_entropy_threshold 0.35 \
+  --confidence_top1_threshold 0.85 \
+  --candidate_top_p 0.95 \
+  --window_sizes 20,40,80,max \
+  --use_model_assisted_detector True
