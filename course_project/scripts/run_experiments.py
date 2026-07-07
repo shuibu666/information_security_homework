@@ -60,6 +60,9 @@ def parse_args():
     parser.add_argument("--ignore_repeated_bigrams", type=str2bool, default=False)
     parser.add_argument("--select_green_tokens", type=str2bool, default=True)
     parser.add_argument("--fixed_deltas", nargs="+", type=float, default=[0.5, 1.0, 2.0, 3.0])
+    parser.add_argument("--run_baseline", type=str2bool, default=True)
+    parser.add_argument("--run_fixed", type=str2bool, default=True)
+    parser.add_argument("--run_adaptive", type=str2bool, default=True)
     parser.add_argument("--adaptive_delta_min", type=float, default=0.5)
     parser.add_argument("--adaptive_delta_max", type=float, default=3.0)
     parser.add_argument("--adaptive_entropy_floor", type=float, default=0.20)
@@ -369,118 +372,121 @@ def main():
 
     results = []
     for prompt_id, prompt in enumerate(prompts, start=1):
-        print(f"[Prompt {prompt_id}/{len(prompts)}] Generating baseline outputs...")
+        if args.run_baseline:
+            print(f"[Prompt {prompt_id}/{len(prompts)}] Generating baseline outputs...")
 
-        plain_text, plain_token_ids, plain_prompt_ids = generate_completion(
-            prompt,
-            args,
-            model,
-            tokenizer,
-            device,
-            is_decoder_only,
-            return_prompt_ids=True,
-        )
-        plain_detection = detect_text(detector, plain_token_ids)
-        plain_weighted_detection = detect_text_model_assisted(cakl_cg_weighted_detector, plain_prompt_ids, plain_token_ids)
-        plain_metrics = compute_text_metrics(plain_text)
-        results.append(
-            build_row(
-                prompt_id=prompt_id,
-                prompt=prompt,
-                method="No Watermark",
-                delta="",
-                delta_min="",
-                delta_max="",
-                generated_text=plain_text,
-                detection_result=plain_detection,
-                text_metrics=plain_metrics,
-                extra_metrics=plain_weighted_detection,
-            )
-        )
-
-        for delta in args.fixed_deltas:
-            print(f"[Prompt {prompt_id}/{len(prompts)}] Fixed delta={delta}")
-            processor = WatermarkLogitsProcessor(
-                vocab=vocab_ids,
-                gamma=args.gamma,
-                delta=delta,
-                seeding_scheme=args.seeding_scheme,
-                select_green_tokens=args.select_green_tokens,
-            )
-            generated_text, token_ids, prompt_token_ids = generate_completion(
+            plain_text, plain_token_ids, plain_prompt_ids = generate_completion(
                 prompt,
                 args,
                 model,
                 tokenizer,
                 device,
                 is_decoder_only,
-                logits_processor=processor,
                 return_prompt_ids=True,
             )
-            detection_result = detect_text(detector, token_ids)
-            weighted_detection = detect_text_model_assisted(cakl_cg_weighted_detector, prompt_token_ids, token_ids)
-            text_metrics = compute_text_metrics(generated_text)
+            plain_detection = detect_text(detector, plain_token_ids)
+            plain_weighted_detection = detect_text_model_assisted(cakl_cg_weighted_detector, plain_prompt_ids, plain_token_ids)
+            plain_metrics = compute_text_metrics(plain_text)
             results.append(
                 build_row(
                     prompt_id=prompt_id,
                     prompt=prompt,
-                    method=f"Fixed Delta {delta}",
-                    delta=delta,
+                    method="No Watermark",
+                    delta="",
                     delta_min="",
                     delta_max="",
-                    generated_text=generated_text,
-                    detection_result=detection_result,
-                    text_metrics=text_metrics,
-                    extra_metrics={
-                        "avg_step_delta": delta,
-                        "observed_delta_min": delta,
-                        "observed_delta_max": delta,
-                        **weighted_detection,
-                    },
+                    generated_text=plain_text,
+                    detection_result=plain_detection,
+                    text_metrics=plain_metrics,
+                    extra_metrics=plain_weighted_detection,
                 )
             )
 
-        print(f"[Prompt {prompt_id}/{len(prompts)}] Adaptive delta")
-        adaptive_processor = AdaptiveDeltaWatermarkLogitsProcessor(
-            vocab=vocab_ids,
-            gamma=args.gamma,
-            delta=args.adaptive_delta_max,
-            delta_min=args.adaptive_delta_min,
-            delta_max=args.adaptive_delta_max,
-            entropy_floor=args.adaptive_entropy_floor,
-            delta_exponent=args.adaptive_delta_exponent,
-            seeding_scheme=args.seeding_scheme,
-            select_green_tokens=args.select_green_tokens,
-        )
-        adaptive_text, adaptive_token_ids, adaptive_prompt_ids = generate_completion(
-            prompt,
-            args,
-            model,
-            tokenizer,
-            device,
-            is_decoder_only,
-            logits_processor=adaptive_processor,
-            return_prompt_ids=True,
-        )
-        adaptive_detection = detect_text(detector, adaptive_token_ids)
-        adaptive_weighted_detection = detect_text_model_assisted(cakl_cg_weighted_detector, adaptive_prompt_ids, adaptive_token_ids)
-        adaptive_metrics = compute_text_metrics(adaptive_text)
-        adaptive_extra = adaptive_processor.get_delta_summary()
-        adaptive_extra.update(adaptive_weighted_detection)
-        results.append(
-            build_row(
-                prompt_id=prompt_id,
-                prompt=prompt,
-                method="Current Adaptive Delta",
-                delta="adaptive",
+        if args.run_fixed:
+            for delta in args.fixed_deltas:
+                print(f"[Prompt {prompt_id}/{len(prompts)}] Fixed delta={delta}")
+                processor = WatermarkLogitsProcessor(
+                    vocab=vocab_ids,
+                    gamma=args.gamma,
+                    delta=delta,
+                    seeding_scheme=args.seeding_scheme,
+                    select_green_tokens=args.select_green_tokens,
+                )
+                generated_text, token_ids, prompt_token_ids = generate_completion(
+                    prompt,
+                    args,
+                    model,
+                    tokenizer,
+                    device,
+                    is_decoder_only,
+                    logits_processor=processor,
+                    return_prompt_ids=True,
+                )
+                detection_result = detect_text(detector, token_ids)
+                weighted_detection = detect_text_model_assisted(cakl_cg_weighted_detector, prompt_token_ids, token_ids)
+                text_metrics = compute_text_metrics(generated_text)
+                results.append(
+                    build_row(
+                        prompt_id=prompt_id,
+                        prompt=prompt,
+                        method=f"Fixed Delta {delta}",
+                        delta=delta,
+                        delta_min="",
+                        delta_max="",
+                        generated_text=generated_text,
+                        detection_result=detection_result,
+                        text_metrics=text_metrics,
+                        extra_metrics={
+                            "avg_step_delta": delta,
+                            "observed_delta_min": delta,
+                            "observed_delta_max": delta,
+                            **weighted_detection,
+                        },
+                    )
+                )
+
+        if args.run_adaptive:
+            print(f"[Prompt {prompt_id}/{len(prompts)}] Adaptive delta")
+            adaptive_processor = AdaptiveDeltaWatermarkLogitsProcessor(
+                vocab=vocab_ids,
+                gamma=args.gamma,
+                delta=args.adaptive_delta_max,
                 delta_min=args.adaptive_delta_min,
                 delta_max=args.adaptive_delta_max,
-                generated_text=adaptive_text,
-                detection_result=adaptive_detection,
-                text_metrics=adaptive_metrics,
-                extra_metrics=adaptive_extra,
+                entropy_floor=args.adaptive_entropy_floor,
+                delta_exponent=args.adaptive_delta_exponent,
+                seeding_scheme=args.seeding_scheme,
+                select_green_tokens=args.select_green_tokens,
             )
-        )
+            adaptive_text, adaptive_token_ids, adaptive_prompt_ids = generate_completion(
+                prompt,
+                args,
+                model,
+                tokenizer,
+                device,
+                is_decoder_only,
+                logits_processor=adaptive_processor,
+                return_prompt_ids=True,
+            )
+            adaptive_detection = detect_text(detector, adaptive_token_ids)
+            adaptive_weighted_detection = detect_text_model_assisted(cakl_cg_weighted_detector, adaptive_prompt_ids, adaptive_token_ids)
+            adaptive_metrics = compute_text_metrics(adaptive_text)
+            adaptive_extra = adaptive_processor.get_delta_summary()
+            adaptive_extra.update(adaptive_weighted_detection)
+            results.append(
+                build_row(
+                    prompt_id=prompt_id,
+                    prompt=prompt,
+                    method="Current Adaptive Delta",
+                    delta="adaptive",
+                    delta_min=args.adaptive_delta_min,
+                    delta_max=args.adaptive_delta_max,
+                    generated_text=adaptive_text,
+                    detection_result=adaptive_detection,
+                    text_metrics=adaptive_metrics,
+                    extra_metrics=adaptive_extra,
+                )
+            )
 
         if args.run_cakl:
             print(f"[Prompt {prompt_id}/{len(prompts)}] CA-KL")
