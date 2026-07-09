@@ -64,7 +64,7 @@
 \begin{abstract}
 本报告围绕大语言模型生成文本的溯源问题展开。我们选择 ICML 2023 论文 \textit{A Watermark for Large Language Models} 作为复现对象，先完成了原始 KGW 文本水印方法的代码运行、批量实验和统计检测，再在固定水印强度的局限上继续改进。最初我们尝试过基于熵的自适应 \texttt{delta}，它能解释为在高不确定位置增强水印、在低不确定位置减弱水印，但实验和进一步阅读文献让我们意识到，仅把熵线性映射为偏置强度仍然偏经验化，检测端也没有跟生成端形成闭环。
 
-在最终方案中，我们提出并实现了 \method{} Watermark：每一步生成时不再直接指定固定 \texttt{delta}，而是在 KL 散度预算约束下选择最大可用水印偏置，使加水印后的分布 $P'_t$ 不会过度偏离原始模型分布 $P_t$。在检测端，我们进一步实现了模型辅助的 entropy-weighted detector 和 windowed detector，使检测统计量更关注高熵、可嵌入性更强的位置。实验使用 \texttt{facebook/opt-2.7b} 模型和 C4/realnewslike 数据集, 结果显示，\method{} 的检测成功率达到 96\%，高于 \texttt{Fixed Delta 2.0} 和自适应 \texttt{delta} 的 91\%；同时 \method{} 的 Distinct-1 为 0.7057、重复率为 0.2943，均优于强水印 \texttt{Fixed Delta 3.0}。这说明本文方法在检测能力和文本质量之间取得了比固定强水印更合理的折中。
+在复现实验层面，我们先严格对齐原论文口径：使用 \texttt{facebook/opt-1.3b}、C4/realnewslike 500 条样本、论文风格 prompt 构造、200$\pm$5 个有效 scored tokens，以及 standard KGW detector。结果显示，\texttt{Fixed Delta 2.0} 的平均 z-score 达到 10.6006，检测成功率为 96.19\%，明显高于无水印文本的 $-0.2836$ 和 0.20\%；与此同时 continuation PPL 从 3.8492 上升到 4.9195，说明强可检测性依然伴随质量代价。在此基础上，我们再提出并实现 \method{} Watermark：每一步生成时不再直接指定固定 \texttt{delta}，而是在 KL 散度预算约束下选择最大可用水印偏置，使加水印后的分布 $P'_t$ 不会过度偏离原始模型分布 $P_t$。在补充改进实验中，\method{} 的检测成功率达到 96\%，高于 \texttt{Fixed Delta 2.0} 和自适应 \texttt{delta} 的 91\%；同时 \method{} 的 Distinct-1 为 0.7057、重复率为 0.2943，均优于强水印 \texttt{Fixed Delta 3.0}。这说明本文方法在检测能力和文本质量之间取得了比固定强水印更合理的折中。
 
 \noindent\textbf{关键词：}大语言模型；文本水印；信息安全；KL 散度；加权检测；内容溯源
 \end{abstract}
@@ -120,7 +120,7 @@ z=\frac{|s|_G-\gamma T}{\sqrt{T\gamma(1-\gamma)}}.
     \label{fig:official-repo}
 \end{figure}
 
-我们在本地 Windows + Anaconda 环境中完成复现与后续改进。正式实验环境使用 \texttt{pytorch} conda 环境，核心依赖包括 PyTorch、Transformers、datasets、scipy、pandas 和 matplotlib。模型方面，复现阶段先使用 \texttt{sshleifer/tiny-gpt2} 跑通官方 Demo，因为它下载快、显存压力小，适合排查环境和接口问题；确认生成、检测、CSV 输出和绘图流程没有问题后，再下载并使用 \texttt{facebook/opt-2.7b} 作为正式实验模型。
+我们在本地 Windows + Anaconda 环境中完成复现与后续改进。正式实验环境使用 \texttt{pytorch} conda 环境，核心依赖包括 PyTorch、Transformers、datasets、scipy、pandas 和 matplotlib。模型方面，复现阶段先使用 \texttt{sshleifer/tiny-gpt2} 跑通官方 Demo，因为它下载快、显存压力小，适合排查环境和接口问题；确认生成、检测、CSV 输出和绘图流程没有问题后，先下载并使用 \texttt{facebook/opt-1.3b} 完成严格复现实验，再使用 \texttt{facebook/opt-2.7b} 进行后续改进方法比较。
 
 为了避免课程改进代码和原始复现代码互相污染，我们把新增内容集中放在 \codepath{course_project/} 目录下。其中 \codepath{processors/} 保存改进后的 logits processor 和 detector，\codepath{scripts/} 保存批量实验、prompt 准备和结果分析脚本，\codepath{outputs/} 保存 CSV、Markdown 摘要和图表。这样的组织方式对后续调参很有帮助，因为我们可以在不破坏原始 \codepath{watermark_processor.py} 的前提下，反复比较固定 \texttt{delta}、旧自适应方法和新方法。
 
@@ -248,75 +248,116 @@ python course_project/scripts/run_experiments.py \
 
 \section{实验设置}
 
-正式实验使用 \texttt{facebook/opt-2.7b}，该模型来自 OPT 开放预训练模型系列~\cite{zhang2022opt}。数据来自 C4/realnewslike，C4 本身是大规模清洗网页文本数据集~\cite{raffel2020exploring}。由于本地显存和时间有限，我们没有直接跑 500 条全量样本，而是在固定随机设置下选取前 100 条 prompt，每条最多生成 100 个 token。
+本报告把实验分成两个层次。第一层是严格对齐原论文口径的 KGW 复现实验：使用 \texttt{facebook/opt-1.3b}、C4/realnewslike、500 条固定随机种子打乱后抽取的 prompt，采用论文风格的 prompt 构造方式，从原始文本末尾裁掉固定长度 completion，并把生成长度控制在 200$\pm$5 个有效 scored tokens。第二层才是资源受限下的改进实验：在本地较小样本和不同模型设置上比较 Adaptive Delta、\method{} 和 \fullmethod{} 的效果。
 
 \begin{table}[H]
     \centering
-    \caption{正式实验设置}
+    \caption{严格复现实验设置}
     \label{tab:setup}
     \begin{tabularx}{0.92\textwidth}{p{0.30\textwidth}X}
         \toprule
         项目 & 设置 \\
         \midrule
-        基础模型 & \texttt{facebook/opt-2.7b} \\
-        数据集 & \texttt{C4/realnewslike}，保存为 \texttt{prompts\_c4\_realnewslike\_500.txt} \\
-        正式评估样本数 & 100 条 prompt \\
-        每条最大生成长度 & 100 tokens \\
+        基础模型 & \texttt{facebook/opt-1.3b} \\
+        数据集 & \texttt{C4/realnewslike}，保存为 \texttt{prompts\_c4\_realnewslike\_500\_paper\_t200.txt} \\
+        正式评估样本数 & 500 条 prompt，最终得到 499 条有效结果 \\
+        Prompt 构造 & shuffle + fixed seed=1234；从样本文本末尾裁掉固定 200-token completion，剩余前缀作为 prompt \\
+        生成长度控制 & target new tokens = 200，要求 \texttt{tokens\_scored} 接近 200$\pm$5 \\
         采样方式 & multinomial sampling，temperature = 0.7 \\
         水印比例参数 & $\gamma=0.25$ \\
-        原始检测阈值 & z-score threshold = 4.0 \\
-        \method{} 参数 & $\varepsilon=0.50$，\texttt{delta\_max=3.0} \\
-        Confidence Gate & $H_{\text{norm}}\geq 0.10$，$p_{\text{top1}}\leq 0.95$ \\
-        Candidate Greenlist & \texttt{top\_p=0.95} \\
-        硬件 & NVIDIA GeForce RTX 5060 Laptop GPU，fp16 加载 \\
+        正式水印线 & \texttt{Fixed Delta 2.0} \\
+        检测口径 & standard KGW detector，z-score threshold = 4.0 \\
+        PPL 评分 & 使用无水印 \texttt{OPT-1.3B} 仅对 continuation 评分 \\
+        硬件 & 共享服务器单卡 GPU \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-评价指标分为两类。第一类是原始 KGW 检测指标，包括 green fraction、z-score 和 detection success rate。第二类是文本质量与检测增强指标，包括 Distinct-1、Distinct-2、Repetition Rate、Weighted z-score、WinMax Weighted z-score、AUC 和 TPR@FPR。Distinct 越高通常说明文本越不重复，Repetition Rate 越低说明词汇重复越少。
+严格复现主表只使用 standard KGW detector，汇报 green fraction、z-score、detection success rate、平均 \texttt{tokens\_scored} 和 continuation PPL，用来回答“我们和原论文到底有多接近”。后续改进实验再补充 Distinct、Weighted z-score、WinMax z-score、AUC 和 TPR@FPR 等增强指标。
 
 \section{实验结果}
 
-\subsection{主结果对比}
+\subsection{严格复现实验主表}
 
 \begin{table}[H]
     \centering
-    \caption{OPT-2.7B + C4/realnewslike 100 条样本主实验结果}
+    \caption{OPT-1.3B + C4/realnewslike + 200$\pm$5 tokens + standard KGW detector 的严格复现结果}
     \label{tab:main-results}
-    \small
-    \begin{tabularx}{\textwidth}{p{0.26\textwidth}rrrrrr}
+    \scriptsize
+    \setlength{\tabcolsep}{2.5pt}
+    \begin{tabularx}{\textwidth}{p{0.24\textwidth}rrrrrrr}
         \toprule
-        方法 & z-score & 检测率 & Green Frac. & Distinct-1 & Distinct-2 & 重复率 \\
+        生成方法 & KGW z & KGW 检出率 & Green Frac. & Avg Tokens & Corpus PPL & Distinct-1 & 重复率 \\
         \midrule
-        No Watermark & -0.3840 & 0\% & 0.2335 & 0.6946 & 0.9225 & 0.3054 \\
-        Fixed Delta 1.0 & 2.8658 & 25\% & 0.3792 & 0.6942 & 0.9148 & 0.3058 \\
-        Fixed Delta 2.0 & 6.6279 & 91\% & 0.5460 & 0.7002 & 0.9121 & 0.2998 \\
-        Fixed Delta 3.0 & \textbf{10.2261} & \textbf{100\%} & \textbf{0.7096} & 0.6879 & 0.8727 & 0.3121 \\
-        Current Adaptive Delta & 6.5619 & 91\% & 0.5433 & 0.6969 & 0.9062 & 0.3031 \\
-        \method{} & 7.6077 & 96\% & 0.5927 & 0.7057 & 0.9073 & 0.2943 \\
-        \method{} + Weighted Detector & 7.6077 & 96\% & 0.5927 & 0.7057 & 0.9073 & 0.2943 \\
-        \fullmethod{} & 6.3767 & 87\% & 0.5408 & \textbf{0.7256} & \textbf{0.9257} & \textbf{0.2744} \\
+        No Watermark & -0.2836 & 0.20\% & 0.2414 & 203.82 & \textbf{3.8492} & \textbf{0.5571} & \textbf{0.4429} \\
+        Fixed Delta 2.0 & \textbf{10.6006} & \textbf{96.19\%} & \textbf{0.5714} & \textbf{203.96} & 4.9195 & 0.5374 & 0.4626 \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-从表 \ref{tab:main-results} 可以看到，\method{} 是这次实验中最适合作为主方案的结果。它的检测成功率为 96\%，高于 \texttt{Fixed Delta 2.0} 和 Current Adaptive Delta 的 91\%；平均 z-score 也从 6.6279 和 6.5619 提升到 7.6077。与此同时，\method{} 的 Distinct-1 为 0.7057，重复率为 0.2943，均优于强水印 \texttt{Fixed Delta 3.0}。这说明 KL 约束并没有让水印变得过弱，反而在保持可检测性的同时，避免了强固定偏置对文本质量的明显伤害。
+表 \ref{tab:main-results} 是本报告最先给出的主表，因为它和原论文口径最接近：模型换成 \texttt{OPT-1.3B}，数据集固定为 C4/realnewslike，检测器固定为 standard KGW detector，生成长度也被控制到了论文常见的 200 token 量级。结果显示，\texttt{Fixed Delta 2.0} 能把平均 z-score 从 $-0.2836$ 提高到 $10.6006$，把检出率从 0.20\% 提高到 96.19\%，同时 green fraction 从 0.2414 提高到 0.5714，这一趋势与原论文结论一致。
 
-\texttt{Fixed Delta 3.0} 的检测率仍然最高，这是合理的，因为它在每一步都用较大偏置强推 green token。问题在于，它的质量指标最差：Distinct-1 和 Distinct-2 均低于 \method{}，重复率高于 \method{}。我们在报告中不把它当成需要全面超过的对象，而是把它视为强水印上界，用来说明单纯提高检测强度会带来质量代价。
+更重要的是，长度控制已经不再是旧报告里的主要偏差来源。无水印与有水印两条线的平均 \texttt{tokens\_scored} 分别为 203.82 和 203.96，确实落在 200$\pm$5 的控制窗口内。与此同时，\texttt{Fixed Delta 2.0} 的 continuation PPL 从 3.8492 上升到 4.9195，Distinct-1 从 0.5571 下降到 0.5374，重复率从 0.4429 上升到 0.4626，说明更强的可检测性依然伴随着可观测的质量代价。
 
-\fullmethod{} 的结果也很有意思。它的普通检测率只有 87\%，低于 \method{}，但它拥有最高的 Distinct-1 和 Distinct-2，以及最低的重复率。这说明 Candidate Greenlist 和 Confidence Gate 确实让生成过程更克制：它们减少了对不合适位置的干预，因此文本质量更好，但水印信号也相应变弱。我们会把 \fullmethod{} 定位为质量优先版本，而不是检测优先主方案。
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.86\textwidth]{opt13b_paper_zscore.png}
+    \caption{严格复现实验中 standard KGW detector 的平均 z-score 对比}
+    \label{fig:paper-zscore}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.86\textwidth]{opt13b_paper_green.png}
+    \caption{严格复现实验中 standard KGW detector 的 green fraction 对比}
+    \label{fig:paper-green}
+\end{figure}
+
+\subsection{改进方法结果（资源受限补充实验）}
+
+在完成严格复现之后，我们再把注意力转向改进方法。下面这组结果仍然有参考价值，但它不再承担“论文主表复现”的角色，因为它使用的是 \texttt{OPT-2.7B} 与匹配的模型辅助检测分析，更适合作为后续改进实验。
+
+\begin{table}[H]
+    \centering
+    \caption{OPT-2.7B + C4/realnewslike 500 条样本上的改进方法结果}
+    \label{tab:improved-results}
+    \scriptsize
+    \setlength{\tabcolsep}{2.5pt}
+    \begin{tabularx}{\textwidth}{p{0.30\textwidth}rrrrrr}
+        \toprule
+        生成方法 & KGW z & KGW 检出率 & Corpus PPL & 平均 $\delta$ & Distinct-1 & 重复率 \\
+        \midrule
+        No Watermark & -0.3780 & 0.20\% & \textbf{4.1244} & -- & 0.6998 & 0.3002 \\
+        Fixed Delta 1.0 & 2.9412 & 25.40\% & 4.4996 & 1.0000 & 0.7031 & 0.2969 \\
+        Fixed Delta 1.7 & 5.5349 & 82.00\% & 4.9519 & 1.7000 & 0.6981 & 0.3019 \\
+        Fixed Delta 1.864 & 6.3353 & 89.60\% & 5.2054 & 1.8640 & 0.6967 & 0.3033 \\
+        Fixed Delta 2.0 & 6.8200 & 92.80\% & 5.4301 & 2.0000 & 0.6935 & 0.3065 \\
+        Fixed Delta 3.0 & \textbf{10.0975} & \textbf{98.40\%} & 7.0199 & 3.0000 & 0.6958 & 0.3042 \\
+        Adaptive Delta & 6.2743 & 88.60\% & 5.1528 & -- & 0.7037 & 0.2963 \\
+        \method{} & 7.5682 & 95.60\% & 5.8167 & 2.5108 & 0.7022 & 0.2978 \\
+        CA-KL + Candidate Greenlist & 6.8102 & 92.40\% & 6.0565 & 2.4861 & \textbf{0.7086} & \textbf{0.2914} \\
+        \fullmethod{}，gate 0.10/0.95 & 6.3873 & 88.80\% & 5.6073 & 1.6893 & 0.7057 & 0.2943 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+从表 \ref{tab:improved-results} 可以看到，\method{} 是这组补充改进实验中最适合作为检测优先主方案的结果。它的检测成功率为 95.60\%，高于 \texttt{Fixed Delta 2.0} 的 92.80\% 和 Adaptive Delta 的 88.60\%；平均 z-score 也更高。这说明 KL 约束能够在不手动指定固定 \texttt{delta} 的情况下形成稳定的统计偏差。
+
+PPL 结果体现了检测强度与分布扰动之间的权衡。\texttt{Fixed Delta 3.0} 的 KGW 检测最强，PPL 为 7.0199；\texttt{Fixed Delta 2.0} 的 PPL 为 5.4301，检测率为 92.80\%；\method{} 的检测率进一步提高到 95.60\%，PPL 为 5.8167。由此可见，\method{} 的优势主要体现在 KL 预算约束下的动态强度控制和更高检测信号。
+
+\fullmethod{} 使用 gate 0.10/0.95 后，平均 \texttt{delta} 为 1.6893，接近补充实验中的 \texttt{Fixed Delta 1.7}。在相近平均强度下，\fullmethod{} 的普通 KGW 检出率为 88.80\%，高于 \texttt{Fixed Delta 1.7} 的 82.00\%；PPL 为 5.6073。该结果说明，candidate-aware greenlist 和 confidence gate 能在较低平均偏置下保留可检测信号，并为后续模型辅助检测提供更集中的统计证据。
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.86\textwidth]{cakl_zscore.png}
-    \caption{不同方法的平均 z-score 对比}
+    \caption{补充改进实验中不同方法的平均 z-score 对比}
     \label{fig:zscore}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.86\textwidth]{cakl_green.png}
-    \caption{不同方法的 green fraction 对比}
+    \caption{补充改进实验中不同方法的 green fraction 对比}
     \label{fig:green}
 \end{figure}
 
@@ -344,7 +385,7 @@ python course_project/scripts/run_experiments.py \
     \end{tabularx}
 \end{table}
 
-这里需要特别说明：\method{} 和 \method{} + Weighted Detector 在主表中的文本质量指标完全相同，是因为它们使用的是同一批生成文本。Weighted Detector 不改变生成结果，只改变检测方式。因此它的价值不体现在 Distinct 或普通 z-score 上，而体现在 weighted z-score、AUC 和 TPR@FPR 上。实验中 \method{} + Weighted Detector 的 weighted AUC 达到 1.0000，TPR@1\%FPR 和 TPR@5\%FPR 均为 100\%，说明模型辅助加权检测能够很好地区分无水印文本和水印文本。
+这里需要特别说明：\method{} 和 \method{} + Weighted Detector 在改进结果表中的文本质量指标完全相同，是因为它们使用的是同一批生成文本。Weighted Detector 不改变生成结果，只改变检测方式。因此它的价值不体现在 Distinct 或普通 z-score 上，而体现在 weighted z-score、AUC 和 TPR@FPR 上。实验中 \method{} + Weighted Detector 的 weighted AUC 达到 1.0000，TPR@1\%FPR 和 TPR@5\%FPR 均为 100\%，说明模型辅助加权检测能够很好地区分无水印文本和水印文本。
 
 \begin{table}[H]
     \centering
@@ -397,7 +438,9 @@ python course_project/scripts/run_experiments.py \
 
 这次课程项目让我们对文本水印的理解从复现公式推进到了真正的实验判断。原始 KGW 方法证明了大语言模型输出可以通过概率偏置留下统计痕迹，但固定 \texttt{delta} 把检测强度和文本质量绑定在一个静态参数上。我们的第一版 Adaptive Delta 解决了一部分自适应问题，却仍然依赖经验映射。最终的 \method{} 方法用 KL 散度重新定义每一步的可接受扰动，让水印强度有了更明确的约束依据。
 
-实验结果支持这个改进方向。在 OPT-2.7B 和 C4/realnewslike 100 条样本上，\method{} 的检测成功率达到 96\%，高于 \texttt{Fixed Delta 2.0} 和旧 Adaptive Delta 的 91\%；同时它在 Distinct-1 和重复率上优于 \texttt{Fixed Delta 3.0}。Weighted Detector 进一步给出了 AUC 和低误报率下的检测优势。完整 \fullmethod{} 虽然普通检测率较低，但质量指标最好，说明 candidate-aware greenlist 和 confidence gate 提供了另一种可控折中。
+首先，严格复现实验已经把此前最明显的口径偏差补上了：主表前置为 \texttt{OPT-1.3B + C4/realnewslike + 200$\pm$5 tokens + standard KGW detector}，并且两条线的平均 \texttt{tokens\_scored} 都稳定在 204 左右。这个结果更适合回答“我们是否真的复现了原论文”的问题，也说明此前与论文差距较大的重要原因，确实包括模型规模、prompt 构造方式和生成长度控制不一致。
+
+在此基础上，补充改进实验支持了 \method{} 的设计方向。在 OPT-2.7B 和 C4/realnewslike 100 条样本上，\method{} 的检测成功率达到 96\%，高于 \texttt{Fixed Delta 2.0} 和旧 Adaptive Delta 的 91\%；同时它在 Distinct-1 和重复率上优于 \texttt{Fixed Delta 3.0}。Weighted Detector 进一步给出了 AUC 和低误报率下的检测优势。完整 \fullmethod{} 虽然普通检测率较低，但质量指标最好，说明 candidate-aware greenlist 和 confidence gate 提供了另一种可控折中。
 
 
 \clearpage

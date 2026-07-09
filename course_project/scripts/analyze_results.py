@@ -63,6 +63,7 @@ def summarize_rows(rows: list[dict[str, str]]):
         method_rows = grouped_rows[method]
         z_scores = [to_float(row["z_score"]) for row in method_rows if to_float(row["z_score"]) is not None]
         green_fractions = [to_float(row["green_fraction"]) for row in method_rows if to_float(row["green_fraction"]) is not None]
+        tokens_counted = [to_float(row["tokens_counted"]) for row in method_rows if to_float(row["tokens_counted"]) is not None]
         word_counts = [to_float(row["word_count"]) for row in method_rows if to_float(row["word_count"]) is not None]
         distinct_1 = [to_float(row["distinct_1"]) for row in method_rows if to_float(row["distinct_1"]) is not None]
         distinct_2 = [to_float(row["distinct_2"]) for row in method_rows if to_float(row["distinct_2"]) is not None]
@@ -81,6 +82,7 @@ def summarize_rows(rows: list[dict[str, str]]):
                 "avg_z_score": mean(z_scores) if z_scores else 0.0,
                 "avg_green_fraction": mean(green_fractions) if green_fractions else 0.0,
                 "watermark_success_rate": success_rate,
+                "avg_tokens_counted": mean(tokens_counted) if tokens_counted else 0.0,
                 "avg_word_count": mean(word_counts) if word_counts else 0.0,
                 "avg_distinct_1": mean(distinct_1) if distinct_1 else 0.0,
                 "avg_distinct_2": mean(distinct_2) if distinct_2 else 0.0,
@@ -151,13 +153,13 @@ def write_summary(summary_rows, detection_quality_rows, summary_md: str):
     lines = [
         "# Watermark Experiment Summary",
         "",
-        "| Method | Samples | Avg z-score | Avg Green Fraction | Detection Success Rate | Avg Word Count | Avg Distinct-1 | Avg Distinct-2 | Avg Repetition Rate |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Method | Samples | Avg z-score | Avg Green Fraction | Detection Success Rate | Avg Tokens Counted | Avg Word Count | Avg Distinct-1 | Avg Distinct-2 | Avg Repetition Rate |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
 
     for row in summary_rows:
         lines.append(
-            "| {method} | {samples} | {avg_z_score:.4f} | {avg_green_fraction:.4f} | {watermark_success_rate:.2%} | {avg_word_count:.2f} | {avg_distinct_1:.4f} | {avg_distinct_2:.4f} | {avg_repetition_rate:.4f} |".format(
+            "| {method} | {samples} | {avg_z_score:.4f} | {avg_green_fraction:.4f} | {watermark_success_rate:.2%} | {avg_tokens_counted:.2f} | {avg_word_count:.2f} | {avg_distinct_1:.4f} | {avg_distinct_2:.4f} | {avg_repetition_rate:.4f} |".format(
                 **row
             )
         )

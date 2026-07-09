@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument("--dataset_text_field", type=str, default="text")
     parser.add_argument("--dataset_streaming", type=str2bool, default=True)
     parser.add_argument("--trust_remote_code", type=str2bool, default=True)
-    parser.add_argument("--shuffle_dataset", type=str2bool, default=False)
+    parser.add_argument("--shuffle_dataset", type=str2bool, default=True)
     parser.add_argument("--dataset_seed", type=int, default=1234)
     parser.add_argument("--shuffle_buffer_size", type=int, default=10_000)
     parser.add_argument("--dataset_skip_examples", type=int, default=0)
@@ -45,7 +45,11 @@ def parse_args():
     parser.add_argument("--min_source_tokens", type=int, default=None)
     parser.add_argument("--output_csv", type=str, default="course_project/outputs/results.csv")
     parser.add_argument("--prompt_max_length", type=int, default=None)
-    parser.add_argument("--max_new_tokens", type=int, default=100)
+    parser.add_argument("--max_new_tokens", type=int, default=200)
+    parser.add_argument("--target_new_tokens", type=int, default=None)
+    parser.add_argument("--length_tolerance", type=int, default=5)
+    parser.add_argument("--paper_style_prompt", type=str2bool, default=False)
+    parser.add_argument("--paper_completion_tokens", type=int, default=None)
     parser.add_argument("--generation_seed", type=int, default=123)
     parser.add_argument("--use_sampling", type=str2bool, default=True)
     parser.add_argument("--sampling_temp", type=float, default=0.7)
@@ -118,19 +122,34 @@ def resolve_prompt_max_length(args, model) -> int:
     if args.prompt_max_length is not None:
         return args.prompt_max_length
 
+    generation_max_tokens = resolve_generation_window(args)[1]
     max_positions = getattr(model.config, "max_position_embeddings", None)
-    if isinstance(max_positions, int) and max_positions > args.max_new_tokens:
-        return max_positions - args.max_new_tokens
+    if isinstance(max_positions, int) and max_positions > generation_max_tokens:
+        return max_positions - generation_max_tokens
 
     max_length = getattr(model.config, "max_length", None)
-    if isinstance(max_length, int) and max_length > args.max_new_tokens:
-        return max_length - args.max_new_tokens
+    if isinstance(max_length, int) and max_length > generation_max_tokens:
+        return max_length - generation_max_tokens
 
-    return max(1, 2048 - args.max_new_tokens)
+    return max(1, 2048 - generation_max_tokens)
+
+
+def resolve_generation_window(args) -> tuple[int | None, int]:
+    if args.target_new_tokens is None:
+        return None, args.max_new_tokens
+
+    target_new_tokens = max(1, args.target_new_tokens)
+    tolerance = max(0, args.length_tolerance)
+    min_new_tokens = max(1, target_new_tokens - tolerance)
+    max_new_tokens = target_new_tokens + tolerance
+    return min_new_tokens, max_new_tokens
 
 
 def build_generation_kwargs(args, tokenizer):
-    generation_kwargs = {"max_new_tokens": args.max_new_tokens}
+    min_new_tokens, max_new_tokens = resolve_generation_window(args)
+    generation_kwargs = {"max_new_tokens": max_new_tokens}
+    if min_new_tokens is not None:
+        generation_kwargs["min_new_tokens"] = min_new_tokens
     if tokenizer.pad_token_id is not None:
         generation_kwargs["pad_token_id"] = tokenizer.pad_token_id
     if args.use_sampling:

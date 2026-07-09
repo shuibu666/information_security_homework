@@ -52,6 +52,22 @@ def load_model_and_tokenizer(args):
     return model, tokenizer, torch.device(device)
 
 
+def resolve_scoring_max_length(args, model, tokenizer) -> int | None:
+    if args.max_length is not None:
+        return args.max_length
+
+    for attr in ("max_position_embeddings", "n_positions", "max_length"):
+        value = getattr(model.config, attr, None)
+        if isinstance(value, int) and 0 < value < 1_000_000:
+            return value
+
+    model_max_length = getattr(tokenizer, "model_max_length", None)
+    if isinstance(model_max_length, int) and 0 < model_max_length < 1_000_000:
+        return model_max_length
+
+    return None
+
+
 def build_scoring_example(row, tokenizer, max_length: int | None):
     prompt = row["prompt"]
     generated_text = row["generated_text"]
@@ -64,6 +80,8 @@ def build_scoring_example(row, tokenizer, max_length: int | None):
         overflow = len(full_ids) - max_length
         full_ids = full_ids[overflow:]
         prompt_len = max(0, prompt_len - overflow)
+
+    prompt_len = min(prompt_len, len(full_ids))
 
     scored_tokens = max(0, len(full_ids) - prompt_len)
     labels = list(full_ids)
@@ -119,7 +137,8 @@ def score_batch(model, batch):
 
 
 def evaluate_rows(rows, args, model, tokenizer, device):
-    examples = [build_scoring_example(row, tokenizer, args.max_length) for row in rows]
+    max_length = resolve_scoring_max_length(args, model, tokenizer)
+    examples = [build_scoring_example(row, tokenizer, max_length) for row in rows]
     evaluated_rows = []
 
     for start in range(0, len(rows), args.batch_size):

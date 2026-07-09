@@ -36,12 +36,35 @@ def save_prompts(prompts: list[str], output_path: str) -> None:
     path.write_text("\n".join(prompts) + "\n", encoding="utf-8")
 
 
-def build_prompt_from_dataset_text(raw_text: str, tokenizer, min_prompt_tokens: int, min_source_tokens: int) -> str | None:
+def resolve_completion_trim_tokens(args) -> int:
+    if getattr(args, "paper_completion_tokens", None) is not None:
+        return max(1, int(args.paper_completion_tokens))
+    if getattr(args, "target_new_tokens", None) is not None:
+        return max(1, int(args.target_new_tokens))
+    return max(1, int(args.max_new_tokens))
+
+
+def build_prompt_from_dataset_text(
+    raw_text: str,
+    tokenizer,
+    min_prompt_tokens: int,
+    min_source_tokens: int,
+    paper_style_prompt: bool,
+    completion_trim_tokens: int,
+) -> str | None:
     token_ids = tokenizer(raw_text, add_special_tokens=False)["input_ids"]
     if len(token_ids) < min_source_tokens:
         return None
 
-    prompt_ids = token_ids[:min_prompt_tokens]
+    if paper_style_prompt:
+        if len(token_ids) <= completion_trim_tokens:
+            return None
+        prompt_ids = token_ids[:-completion_trim_tokens]
+        if len(prompt_ids) < min_prompt_tokens:
+            return None
+    else:
+        prompt_ids = token_ids[:min_prompt_tokens]
+
     prompt_tokens = tokenizer.convert_ids_to_tokens(prompt_ids, skip_special_tokens=True)
     prompt = tokenizer.convert_tokens_to_string(prompt_tokens).strip()
     prompt = re.sub(r"\s+", " ", prompt).strip()
@@ -64,7 +87,8 @@ def load_hf_dataset_prompts(args, tokenizer) -> list[str]:
     if args.shuffle_dataset:
         dataset = dataset.shuffle(seed=args.dataset_seed, buffer_size=args.shuffle_buffer_size)
 
-    min_source_tokens = args.min_source_tokens or (args.min_prompt_tokens + args.max_new_tokens)
+    completion_trim_tokens = resolve_completion_trim_tokens(args)
+    min_source_tokens = args.min_source_tokens or (args.min_prompt_tokens + completion_trim_tokens)
     prompts: list[str] = []
     skipped = 0
 
@@ -81,6 +105,8 @@ def load_hf_dataset_prompts(args, tokenizer) -> list[str]:
             tokenizer=tokenizer,
             min_prompt_tokens=args.min_prompt_tokens,
             min_source_tokens=min_source_tokens,
+            paper_style_prompt=getattr(args, "paper_style_prompt", False),
+            completion_trim_tokens=completion_trim_tokens,
         )
         if prompt is None:
             continue
