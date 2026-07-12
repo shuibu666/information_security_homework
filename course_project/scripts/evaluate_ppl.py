@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import math
 from collections import defaultdict
 from pathlib import Path
@@ -68,12 +69,32 @@ def resolve_scoring_max_length(args, model, tokenizer) -> int | None:
     return None
 
 
-def build_scoring_example(row, tokenizer, max_length: int | None):
-    prompt = row["prompt"]
-    generated_text = row["generated_text"]
+def parse_saved_token_ids(row, field: str) -> list[int]:
+    """Read exact token IDs written by final-v1 generation without re-tokenizing text."""
+    raw = row.get(field)
+    if raw is None or raw == "":
+        raise ValueError(f"row {row.get('generation_id', row.get('prompt_id', '?'))} lacks required {field}")
+    value = json.loads(raw) if isinstance(raw, str) else raw
+    if not isinstance(value, list) or not all(isinstance(token_id, int) for token_id in value):
+        raise ValueError(f"{field} must be a JSON list of integer token IDs")
+    return value
 
-    prompt_ids = tokenizer(prompt, add_special_tokens=True)["input_ids"]
-    full_ids = tokenizer(prompt + generated_text, add_special_tokens=True)["input_ids"]
+
+def build_scoring_example(row, tokenizer, max_length: int | None):
+    # A final-v1 run must use the same tokenizer vocabulary for generation and
+    # oracle scoring.  Failing is safer than guessing a cross-tokenizer boundary
+    # from concatenated strings.
+    generation_tokenizer_id = row.get("generation_tokenizer_id", row.get("tokenizer_id", ""))
+    if generation_tokenizer_id and generation_tokenizer_id != tokenizer.name_or_path:
+        raise ValueError(
+            "exact token-ID PPL requires an identical generation/oracle tokenizer; "
+            f"got generation={generation_tokenizer_id!r}, oracle={tokenizer.name_or_path!r}"
+        )
+    prompt_ids = parse_saved_token_ids(row, "prompt_token_ids")
+    continuation_ids = parse_saved_token_ids(row, "continuation_token_ids")
+    if not prompt_ids or not continuation_ids:
+        raise ValueError("PPL requires a non-empty prompt and continuation token sequence")
+    full_ids = prompt_ids + continuation_ids
     prompt_len = len(prompt_ids)
 
     if max_length is not None and len(full_ids) > max_length:
@@ -94,6 +115,7 @@ def build_scoring_example(row, tokenizer, max_length: int | None):
         "input_ids": full_ids,
         "labels": labels,
         "scored_tokens": scored_tokens,
+        "expected_continuation_tokens": len(continuation_ids),
     }
 
 
@@ -152,6 +174,10 @@ def evaluate_rows(rows, args, model, tokenizer, device):
             avg_nll = (float(nll_sum) / scored_tokens) if scored_tokens else None
             ppl = math.exp(avg_nll) if avg_nll is not None and avg_nll < 100 else None
             evaluated = dict(row)
+            if scored_tokens != example["expected_continuation_tokens"]:
+                raise ValueError(
+                    "scoring truncation changed the continuation boundary; final-v1 does not permit silent attrition"
+                )
             evaluated["ppl_num_scored_tokens"] = scored_tokens
             evaluated["ppl_nll_sum"] = f"{float(nll_sum):.8f}" if scored_tokens else ""
             evaluated["ppl_avg_nll"] = f"{avg_nll:.8f}" if avg_nll is not None else ""

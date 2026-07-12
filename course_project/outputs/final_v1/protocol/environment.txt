@@ -1,0 +1,19 @@
+2026-07-12T17:03:03+08:00
+ Static hostname: h102
+       Icon name: computer-server
+         Chassis: server 🖳
+      Machine ID: f62750662f6345558092fae52a2e4f3c
+         Boot ID: aaab9959a49c4069901e9812de30a7cc
+Operating System: Ubuntu 24.04.4 LTS
+          Kernel: Linux 6.8.0-134-generic
+    Architecture: x86-64
+ Hardware Vendor: Supermicro
+  Hardware Model: AS -4125GS-TNRT
+Firmware Version: 3.4
+   Firmware Date: Tue 2025-02-11
+    Firmware Age: 1y 4month 4w 1d
+Python 3.12.3
+torch unavailable: No module named 'torch'
+transformers unavailable: No module named 'transformers'
+datasets unavailable: No module named 'datasets'
+tokenizers unavailable: No module named 'tokenizers'

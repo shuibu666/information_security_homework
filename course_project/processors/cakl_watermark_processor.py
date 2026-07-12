@@ -9,6 +9,7 @@ import scipy.stats
 import torch
 
 from watermark_processor import WatermarkBase, WatermarkLogitsProcessor
+from course_project.cakl_math import kl_q_to_p
 
 
 def _mean_or_empty(values: Iterable[float]) -> float | str:
@@ -111,12 +112,7 @@ class CAKLWatermarkLogitsProcessor(WatermarkLogitsProcessor):
         return candidate_permutation[(candidate_permutation.numel() - greenlist_size) :]
 
     def _kl_for_delta(self, delta: float, p_green_mass: float) -> float:
-        if delta <= 0.0 or p_green_mass <= 0.0:
-            return 0.0
-        p_green_mass = min(max(p_green_mass, 0.0), 1.0)
-        normalizer = 1.0 + (exp(delta) - 1.0) * p_green_mass
-        q_green_mass = exp(delta) * p_green_mass / normalizer
-        return delta * q_green_mass - log(normalizer)
+        return kl_q_to_p(delta, p_green_mass)
 
     def _solve_delta(self, p_green_mass: float) -> tuple[float, float]:
         if self.kl_epsilon <= 0.0 or self.delta_max <= 0.0 or p_green_mass <= 0.0:
@@ -164,7 +160,12 @@ class CAKLWatermarkLogitsProcessor(WatermarkLogitsProcessor):
             "top1_prob": top1_prob,
             "p_green_mass": p_green_mass,
             "delta": delta,
+            # With final-v1's temperature=1/top-k=0/top-p=1 protocol, the
+            # processor distribution is the sampling distribution.  Keeping
+            # both names makes this invariant explicit in every raw record.
             "kl": kl_value,
+            "preprocessor_kl": kl_value,
+            "actual_sampling_kl": kl_value,
             "gate_passed": 1.0 if gate_passed else 0.0,
             "candidate_size": float(candidate_size),
         }
@@ -172,13 +173,23 @@ class CAKLWatermarkLogitsProcessor(WatermarkLogitsProcessor):
 
     def get_generation_summary(self) -> dict[str, float | str]:
         deltas = [row["delta"] for row in self.step_history]
+        kls = [row["actual_sampling_kl"] for row in self.step_history]
         return {
-            "avg_kl": _mean_or_empty(row["kl"] for row in self.step_history),
+            "avg_kl": _mean_or_empty(kls),
+            "avg_actual_kl": _mean_or_empty(kls),
+            "actual_kl_p50": _percentile_or_empty(kls, 0.50),
+            "actual_kl_p95": _percentile_or_empty(kls, 0.95),
+            "actual_kl_p99": _percentile_or_empty(kls, 0.99),
+            "actual_kl_max": max(kls) if kls else "",
             "avg_delta": _mean_or_empty(deltas),
             "delta_std": _population_std_or_empty(deltas),
             "delta_p25": _percentile_or_empty(deltas, 0.25),
             "delta_p50": _percentile_or_empty(deltas, 0.50),
             "delta_p75": _percentile_or_empty(deltas, 0.75),
+            "delta_p95": _percentile_or_empty(deltas, 0.95),
+            "delta_max_observed": max(deltas) if deltas else "",
+            "delta_zero_rate": _mean_or_empty(1.0 if value == 0.0 else 0.0 for value in deltas),
+            "delta_max_saturation_rate": _mean_or_empty(1.0 if abs(value - self.delta_max) < 1e-6 else 0.0 for value in deltas),
             "avg_entropy": _mean_or_empty(row["entropy"] for row in self.step_history),
             "avg_p_green_mass": _mean_or_empty(row["p_green_mass"] for row in self.step_history),
             "gate_pass_rate": _mean_or_empty(row["gate_passed"] for row in self.step_history),
