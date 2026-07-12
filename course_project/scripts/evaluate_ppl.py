@@ -17,12 +17,15 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from course_project.prompt_utils import str2bool
+from course_project.final_protocol import read_jsonl, tokenizer_vocab_fingerprint, write_jsonl_atomic
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate continuation perplexity for generated rows.")
-    parser.add_argument("--input_csv", type=str, required=True)
-    parser.add_argument("--output_csv", type=str, required=True)
+    parser.add_argument("--input_csv", type=str, default=None, help="Legacy CSV input.")
+    parser.add_argument("--input_jsonl", type=str, default=None, help="Final-v1 raw generation JSONL input.")
+    parser.add_argument("--output_csv", type=str, default=None, help="Legacy CSV output.")
+    parser.add_argument("--output_jsonl", type=str, default=None, help="Final-v1 PPL JSONL output.")
     parser.add_argument("--summary_md", type=str, required=True)
     parser.add_argument("--model_name_or_path", type=str, default="facebook/opt-125m")
     parser.add_argument("--use_gpu", type=str2bool, default=True)
@@ -35,6 +38,14 @@ def parse_args():
 def read_rows(path: str) -> list[dict[str, str]]:
     with Path(path).open("r", encoding="utf-8-sig", newline="") as csv_file:
         return list(csv.DictReader(csv_file))
+
+
+def resolve_io(args) -> tuple[str, str]:
+    inputs = [path for path in (args.input_csv, args.input_jsonl) if path]
+    outputs = [path for path in (args.output_csv, args.output_jsonl) if path]
+    if len(inputs) != 1 or len(outputs) != 1:
+        raise ValueError("provide exactly one input (--input_csv or --input_jsonl) and one output (--output_csv or --output_jsonl)")
+    return inputs[0], outputs[0]
 
 
 def load_model_and_tokenizer(args):
@@ -85,9 +96,12 @@ def build_scoring_example(row, tokenizer, max_length: int | None):
     # oracle scoring.  Failing is safer than guessing a cross-tokenizer boundary
     # from concatenated strings.
     generation_tokenizer_id = row.get("generation_tokenizer_id", row.get("tokenizer_id", ""))
-    if generation_tokenizer_id and generation_tokenizer_id != tokenizer.name_or_path:
+    generation_vocab_hash = row.get("generation_tokenizer_vocab_hash", "")
+    same_tokenizer = generation_tokenizer_id == tokenizer.name_or_path
+    same_vocab = bool(generation_vocab_hash) and generation_vocab_hash == tokenizer_vocab_fingerprint(tokenizer)
+    if generation_tokenizer_id and not (same_tokenizer or same_vocab):
         raise ValueError(
-            "exact token-ID PPL requires an identical generation/oracle tokenizer; "
+            "exact token-ID PPL requires an identical generation/oracle tokenizer vocabulary; "
             f"got generation={generation_tokenizer_id!r}, oracle={tokenizer.name_or_path!r}"
         )
     prompt_ids = parse_saved_token_ids(row, "prompt_token_ids")
@@ -189,6 +203,9 @@ def evaluate_rows(rows, args, model, tokenizer, device):
 
 def write_rows(rows, output_csv: str):
     output_path = Path(output_csv)
+    if output_path.suffix.lower() == ".jsonl":
+        write_jsonl_atomic(output_path, rows)
+        return
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = list(rows[0].keys()) if rows else []
     with output_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
@@ -213,7 +230,8 @@ def percentile(values: list[float], q: float) -> float:
 def summarize(rows):
     grouped = defaultdict(list)
     for row in rows:
-        grouped[row["method"]].append(row)
+        method = row.get("method") or f"{row.get('generator_id', '')}/{row.get('parameter_id', '')}"
+        grouped[method].append(row)
 
     summary_rows = []
     for method, method_rows in grouped.items():
@@ -285,13 +303,14 @@ def write_summary(summary_rows, summary_md: str):
 
 def main():
     args = parse_args()
-    rows = read_rows(args.input_csv)
+    input_path, output_path = resolve_io(args)
+    rows = read_jsonl(input_path) if args.input_jsonl else read_rows(input_path)
     model, tokenizer, device = load_model_and_tokenizer(args)
     evaluated_rows = evaluate_rows(rows, args, model, tokenizer, device)
-    write_rows(evaluated_rows, args.output_csv)
+    write_rows(evaluated_rows, output_path)
     summary_rows = summarize(evaluated_rows)
     write_summary(summary_rows, args.summary_md)
-    print(f"Saved PPL rows to {args.output_csv}")
+    print(f"Saved PPL rows to {output_path}")
     print(f"Saved PPL summary to {args.summary_md}")
 
 

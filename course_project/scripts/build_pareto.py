@@ -72,6 +72,20 @@ def write_csv(path: Path, rows: list[dict[str, object]], fields: list[str]) -> N
         writer.writerows(rows)
 
 
+def validate_manifest_sources(manifest: dict[str, object]) -> None:
+    """Reject source identities shared by distinct Pareto operating points."""
+    source_ids: set[str] = set()
+    names: set[str] = set()
+    for source in manifest.get("sources", []):
+        source_id, name = str(source.get("source_id", "")), str(source.get("name", ""))
+        if not source_id or source_id in source_ids:
+            raise ValueError(f"Pareto source_id must be non-empty and unique: {source_id!r}")
+        if not name or name in names:
+            raise ValueError(f"Pareto point name must be non-empty and unique: {name!r}")
+        source_ids.add(source_id)
+        names.add(name)
+
+
 def aggregate(rows: list[dict[str, object]]) -> dict[str, object]:
     result = {key: rows[0].get(key, "") for key in ("name", "family", "parameter", "epsilon", "source_id", "method")}
     result["samples"] = len(rows)
@@ -118,7 +132,8 @@ def draw_figures(summary_rows: list[dict[str, object]], output_dir: Path) -> Non
         plt.close(figure)
 
     plot("corpus_ppl", "kgw_detection_rate", "ppl_vs_kgw_detection.pdf", "Standard KGW detection rate")
-    plot("corpus_ppl", "tpr_at_1pct_fpr", "ppl_vs_tpr1.pdf", "TPR at 1% FPR")
+    # This legacy input has no held-out metric table.  It must not emit a
+    # reportable TPR@1%FPR plot from its in-sample diagnostics.
 
     cakl_rows = sorted([row for row in summary_rows if row.get("family") == "CA-KL" and row.get("epsilon") is not None], key=lambda row: float(row["epsilon"]))
     for y_field, filename, label in (("avg_delta", "epsilon_vs_avg_delta.pdf", "Average delta"), ("avg_actual_kl", "epsilon_vs_avg_kl.pdf", "Average actual KL")):
@@ -137,6 +152,7 @@ def main() -> None:
     args = parse_args()
     manifest_path = Path(args.manifest)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    validate_manifest_sources(manifest)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     all_rows: list[dict[str, object]] = []
@@ -183,7 +199,8 @@ def main() -> None:
             summary[f"{prefix}_auc_in_sample"] = auc(pos, neg)
             summary[f"{prefix}_tpr_at_1pct_fpr_in_sample"] = threshold_tpr(pos, neg, 0.01)
             summary[f"{prefix}_tpr_at_5pct_fpr_in_sample"] = threshold_tpr(pos, neg, 0.05)
-        summary["tpr_at_1pct_fpr"] = summary["weighted_tpr_at_1pct_fpr_in_sample"]
+        # Keep in-sample diagnostics explicitly labelled; final-v1 Pareto uses
+        # only the held-out calibration output for reportable TPR/FPR.
     summary_rows.sort(key=lambda row: (str(row.get("family")), float(row.get("epsilon") or -1), str(row.get("parameter"))))
     summary_fields = list(dict.fromkeys([key for row in summary_rows for key in row]))
     write_csv(output_dir / "pareto_summary.csv", summary_rows, summary_fields)

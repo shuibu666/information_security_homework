@@ -26,6 +26,11 @@ def config_hash(config: Mapping[str, object]) -> str:
     return sha256_text(canonical_json(dict(config)))
 
 
+def tokenizer_vocab_fingerprint(tokenizer) -> str:
+    """Stable identity for exact-ID reuse across separately named checkpoints."""
+    return config_hash({"vocab": tokenizer.get_vocab()})
+
+
 def detector_config_id(config: Mapping[str, object]) -> str:
     """A detector identifier that changes whenever any scoring rule changes."""
     return f"det-{config_hash(config)[:16]}"
@@ -137,3 +142,26 @@ def validate_eval_manifest(records: Iterable[Mapping[str, object]], expected_per
         expected = {"validation": expected_per_split, "test": expected_per_split}
         if observed != expected:
             raise ValueError(f"split sizes must be {expected}, got {observed}")
+
+
+def validate_generation_records(records: Iterable[Mapping[str, object]]) -> None:
+    """Reject duplicate raw generations before any detector/evaluator can use them."""
+    generation_ids: set[str] = set()
+    semantic_keys: set[tuple[str, str, int, str, str]] = set()
+    required = {"generation_id", "split", "prompt_id", "base_seed", "generator_id", "parameter_id", "prompt_token_ids", "continuation_token_ids", "generated_token_count", "config_hash"}
+    for index, row in enumerate(records):
+        missing = required - set(row)
+        if missing:
+            raise ValueError(f"generation record {index} lacks fields: {sorted(missing)}")
+        generation = str(row["generation_id"])
+        if not generation or generation in generation_ids:
+            raise ValueError(f"duplicate or empty generation_id: {generation!r}")
+        generation_ids.add(generation)
+        key = (str(row["split"]), str(row["prompt_id"]), int(row["base_seed"]), str(row["generator_id"]), str(row["parameter_id"]))
+        if key in semantic_keys:
+            raise ValueError(f"duplicate generation key: {key}")
+        semantic_keys.add(key)
+        if len(row["continuation_token_ids"]) != int(row["generated_token_count"]):
+            raise ValueError(f"generation {generation} continuation length mismatch")
+        if int(row["generated_token_count"]) != 200:
+            raise ValueError(f"generation {generation} must contain exactly 200 tokens")

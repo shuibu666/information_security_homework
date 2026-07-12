@@ -15,7 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from course_project.final_protocol import config_hash, generation_id, read_jsonl, stable_sample_seed, write_json_atomic, write_jsonl_atomic
+from course_project.final_protocol import config_hash, generation_id, read_jsonl, stable_sample_seed, tokenizer_vocab_fingerprint, validate_generation_records, write_json_atomic, write_jsonl_atomic
 from course_project.processors.cakl_watermark_processor import CAKLWatermarkLogitsProcessor
 from watermark_processor import WatermarkLogitsProcessor
 
@@ -34,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base_seed", type=int, required=True)
     parser.add_argument("--shard_index", type=int, default=0)
     parser.add_argument("--shard_count", type=int, default=1)
+    parser.add_argument("--limit_records", type=int, default=None, help="Use the first N fixed-manifest records (Phase 1 smoke only).")
     parser.add_argument("--gamma", type=float, default=.25)
     parser.add_argument("--fixed_delta", type=float, default=None)
     parser.add_argument("--kl_epsilon", type=float, default=None)
@@ -64,6 +65,8 @@ def generator_flags(generator_id: str) -> tuple[bool, bool]:
 def validate_args(args: argparse.Namespace) -> None:
     if args.shard_count < 1 or not 0 <= args.shard_index < args.shard_count:
         raise ValueError("shard_index must be in [0, shard_count)")
+    if args.limit_records is not None and args.limit_records < 1:
+        raise ValueError("limit_records must be positive when provided")
     if args.min_new_tokens != args.max_new_tokens or args.max_new_tokens != 200:
         raise ValueError("final-v1 requires min_new_tokens=max_new_tokens=200")
     if not (args.temperature == 1.0 and args.top_k == 0 and args.top_p == 1.0):
@@ -107,6 +110,8 @@ def main() -> None:
             return
         raise RuntimeError("existing output has a different config hash; choose a new output path")
     records = [row for row in read_jsonl(manifest_path) if row["split"] == args.split]
+    if args.limit_records is not None:
+        records = records[:args.limit_records]
     records = [row for index, row in enumerate(records) if index % args.shard_count == args.shard_index]
     if not records:
         raise ValueError("selected shard contains no manifest records")
@@ -114,6 +119,7 @@ def main() -> None:
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, revision=args.model_revision, torch_dtype=dtype_for_args(args)).to(args.device).eval()
+    tokenizer_fingerprint = tokenizer_vocab_fingerprint(tokenizer)
     max_context = getattr(model.config, "max_position_embeddings", None)
     vocab_ids = list(range(len(tokenizer)))
     output: list[dict[str, object]] = []
@@ -151,12 +157,14 @@ def main() -> None:
             "prompt_id": str(record["source_id"]), "source_id": record["source_id"], "split": args.split,
             "base_seed": args.base_seed, "sample_seed": sample_seed, "generator_id": args.generator_id,
             "parameter_id": args.parameter_id, "generator_config": run_config, "generation_tokenizer_id": args.model_name_or_path,
+            "generation_tokenizer_vocab_hash": tokenizer_fingerprint,
             "prompt_token_ids": prompt_ids, "continuation_token_ids": continuation_ids,
             "continuation_text": tokenizer.decode(continuation_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False),
             "generated_token_count": len(continuation_ids), "finish_reason": "length", "runtime_ms": elapsed_ms,
             "peak_memory_mb": (torch.cuda.max_memory_allocated(args.device) / 1024**2) if str(args.device).startswith("cuda") else None,
             "config_hash": fingerprint, **summary,
         })
+    validate_generation_records(output)
     digest = write_jsonl_atomic(output_path, output)
     write_json_atomic(metadata_path, {"config_hash": fingerprint, "records": len(output), "sha256": digest, "complete": True})
     print(f"wrote {len(output)} generation records to {output_path}; sha256={digest}")

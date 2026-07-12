@@ -86,6 +86,7 @@ def main() -> None:
             "prompt_id": watermarked["prompt_id"],
             "base_seed": watermarked["base_seed"],
             "generator_id": watermarked["generator_id"],
+            "parameter_id": watermarked["parameter_id"],
             "simcse_model": args.model_name_or_path,
             "simcse_cosine": float(cosine),
         })

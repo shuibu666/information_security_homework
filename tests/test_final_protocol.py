@@ -5,11 +5,13 @@ import json
 import pytest
 
 from course_project.cakl_math import green_mass_after_bias, kl_q_to_p
-from course_project.final_calibration import calibrate_human_thresholds, evaluate_test_scores
+from course_project.final_calibration import calibrate_human_thresholds, conservative_threshold, evaluate_test_scores
 from course_project.final_protocol import (
     detector_config_id,
     generation_id,
     stable_sample_seed,
+    validate_generation_records,
+    write_json_atomic,
     validate_eval_manifest,
     write_jsonl_atomic,
 )
@@ -53,11 +55,33 @@ def test_manifest_rejects_duplicate_source_and_bad_lengths():
         validate_eval_manifest([record], expected_per_split=None)
 
 
+def test_eval_manifest_has_exact_split_sizes_and_rejects_replacement_characters():
+    records = [valid_record(f"validation-{index}", "validation") for index in range(500)]
+    records += [valid_record(f"test-{index}", "test") for index in range(500)]
+    validate_eval_manifest(records)
+    records[0]["prompt_text"] = "bad \ufffd text"
+    with pytest.raises(ValueError, match="replacement-character"):
+        validate_eval_manifest(records)
+
+
 def test_jsonl_writer_is_atomic_and_hashes_content(tmp_path):
     destination = tmp_path / "records.jsonl"
     digest = write_jsonl_atomic(destination, [{"b": 2, "a": 1}])
     assert len(digest) == 64
     assert json.loads(destination.read_text(encoding="utf-8")) == {"a": 1, "b": 2}
+    metadata_hash = write_json_atomic(tmp_path / "complete.json", {"config_hash": "abc", "complete": True})
+    assert len(metadata_hash) == 64
+    assert json.loads((tmp_path / "complete.json").read_text(encoding="utf-8"))["config_hash"] == "abc"
+
+
+def test_duplicate_generation_id_fails():
+    row = {
+        "generation_id": "g1", "split": "validation", "prompt_id": "p1", "base_seed": 1234,
+        "generator_id": "cakl_base", "parameter_id": "eps=0.2", "prompt_token_ids": [1],
+        "continuation_token_ids": list(range(200)), "generated_token_count": 200, "config_hash": "cfg",
+    }
+    with pytest.raises(ValueError, match="generation_id"):
+        validate_generation_records([row, dict(row)])
 
 
 def test_cakl_closed_form_is_nonnegative_and_monotone():
@@ -72,15 +96,15 @@ def test_cakl_closed_form_is_nonnegative_and_monotone():
 
 def test_calibration_is_human_only_conservative_and_hash_matched():
     validation = [
-        {"generation_id": f"human-{index}", "detector_config_id": "d", "detector_config_hash": "h", "role": "human_completion", "score": score}
+        {"generation_id": f"human-{index}", "prompt_id": f"p{index}", "detector_config_id": "d", "detector_config_hash": "h", "role": "human_completion", "score": score}
         for index, score in enumerate((0.0, 1.0, 2.0, 3.0))
     ]
     thresholds = calibrate_human_thresholds(validation, [0.25])
     assert thresholds[0]["threshold"] == 2.0
     assert thresholds[0]["calibration_empirical_fpr"] == 0.25
     test_rows = [
-        {"generation_id": "test-human", "detector_config_id": "d", "detector_config_hash": "h", "role": "human_completion", "score": 2.0},
-        {"generation_id": "test-positive", "detector_config_id": "d", "detector_config_hash": "h", "role": "watermarked", "score": 3.0},
+        {"generation_id": "test-human", "prompt_id": "p", "detector_config_id": "d", "detector_config_hash": "h", "role": "human_completion", "score": 2.0},
+        {"generation_id": "test-positive", "prompt_id": "p", "detector_config_id": "d", "detector_config_hash": "h", "role": "watermarked", "score": 3.0},
     ]
     metrics = evaluate_test_scores(test_rows, thresholds)
     assert {row["role"] for row in metrics} == {"human_completion", "watermarked"}
@@ -88,3 +112,10 @@ def test_calibration_is_human_only_conservative_and_hash_matched():
         row["detector_config_hash"] = "wrong"
     with pytest.raises(ValueError, match="match calibration detector hash"):
         evaluate_test_scores(test_rows, thresholds)
+
+
+def test_calibration_respects_target_fpr_with_ties():
+    scores = [0.0, 2.0, 2.0, 2.0]
+    threshold = conservative_threshold(scores, .25)
+    assert threshold == 2.0
+    assert sum(score > threshold for score in scores) / len(scores) <= .25

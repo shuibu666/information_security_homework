@@ -1,4 +1,8 @@
-# Gate A status — 2026-07-12
+# Superseded preliminary status — 2026-07-12
+
+This was an early, incomplete status written before the document-order P0
+completion and Phase 1 smoke execution. It is retained as an audit trail only.
+The authoritative Gate A result is `gate_a_audit.md`.
 
 ## Completed P0 foundations
 

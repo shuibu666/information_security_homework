@@ -27,8 +27,9 @@ def group_scores(rows: Iterable[Mapping[str, object]]) -> dict[str, list[Mapping
     for row in rows:
         detector_id = str(row.get("detector_config_id", ""))
         generation_id = str(row.get("generation_id", ""))
-        if not detector_id or not generation_id:
-            raise ValueError("each detection row requires detector_config_id and generation_id")
+        prompt_id = str(row.get("prompt_id", ""))
+        if not detector_id or not generation_id or not prompt_id:
+            raise ValueError("each detection row requires detector_config_id, generation_id, and prompt_id")
         key = (detector_id, generation_id)
         if key in seen:
             raise ValueError(f"duplicate detection score for {key}")
@@ -36,9 +37,11 @@ def group_scores(rows: Iterable[Mapping[str, object]]) -> dict[str, list[Mapping
         if row.get("detector_config_hash") in (None, ""):
             raise ValueError(f"{key} lacks detector_config_hash")
         try:
-            float(row["score"])
+            score = float(row["score"])
         except (KeyError, TypeError, ValueError) as error:
             raise ValueError(f"{key} has no finite numeric score") from error
+        if not math.isfinite(score):
+            raise ValueError(f"{key} has a non-finite score")
         grouped[detector_id].append(row)
     return grouped
 
@@ -78,16 +81,29 @@ def evaluate_test_scores(test_rows: Iterable[Mapping[str, object]], threshold_ro
         if len(hashes) != 1:
             raise ValueError(f"detector_config_id {detector_id} maps to multiple hashes")
         actual_hash = next(iter(hashes))
+        human_ids = {str(row["prompt_id"]) for row in rows if row.get("role") == "human_completion"}
+        if not human_ids:
+            raise ValueError(f"{detector_id} has no held-out human_completion scores")
+        grouped_roles: dict[tuple[str, str, str], list[Mapping[str, object]]] = defaultdict(list)
+        for row in rows:
+            role = str(row.get("role", ""))
+            key = (role, str(row.get("generator_id", "")), str(row.get("parameter_id", "")))
+            grouped_roles[key].append(row)
+        for (role, generator_id, parameter_id), role_rows in grouped_roles.items():
+            if role == "human_completion":
+                continue
+            role_ids = {str(row["prompt_id"]) for row in role_rows}
+            if role_ids != human_ids:
+                raise ValueError(
+                    f"{detector_id} {role}/{generator_id}/{parameter_id} does not share exactly the human prompt IDs"
+                )
         for (threshold_detector_id, target), threshold_row in thresholds.items():
             if threshold_detector_id != detector_id:
                 continue
             if str(threshold_row["detector_config_hash"]) != actual_hash:
                 raise ValueError(f"test scores for {detector_id} do not match calibration detector hash")
             threshold = float(threshold_row["threshold"])
-            for role in ("human_completion", "no_watermark", "watermarked"):
-                role_rows = [row for row in rows if row.get("role") == role]
-                if not role_rows:
-                    continue
+            for (role, generator_id, parameter_id), role_rows in sorted(grouped_roles.items()):
                 output.append({
                     "detector_config_id": detector_id,
                     "detector_config_hash": actual_hash,
@@ -95,6 +111,8 @@ def evaluate_test_scores(test_rows: Iterable[Mapping[str, object]], threshold_ro
                     "threshold": threshold,
                     "comparison": ">",
                     "role": role,
+                    "generator_id": generator_id,
+                    "parameter_id": parameter_id,
                     "samples": len(role_rows),
                     "positive_rate": sum(float(row["score"]) > threshold for row in role_rows) / len(role_rows),
                 })
