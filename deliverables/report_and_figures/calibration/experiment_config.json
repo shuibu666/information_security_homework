@@ -1,0 +1,18 @@
+{
+  "input_csv": "F:\\桌面\\信息安全\\期末考查\\information_security_homework\\course_project\\outputs\\opt27b_fp32_c4_500_gate010_095_results.csv",
+  "ppl_csv": "F:\\桌面\\信息安全\\期末考查\\information_security_homework\\course_project\\outputs\\opt27b_fp32_c4_500_gate010_095_ppl_results.csv",
+  "methods": [
+    "CA-KL",
+    "CA-KL + Candidate Greenlist",
+    "CA-KL + Candidate Greenlist + Weighted/WinMax",
+    "CA-KL + Weighted Detector"
+  ],
+  "folds": 5,
+  "seed": 1234,
+  "thresholds": {
+    "tpr_at_1pct_fpr": "99th empirical percentile of each fold's 400 negative calibration scores",
+    "tpr_at_5pct_fpr": "95th empirical percentile of each fold's 400 negative calibration scores"
+  },
+  "bootstrap_repetitions": 2000,
+  "confidence_level": 0.95
+}

@@ -11,6 +11,7 @@ ROOT_DIR="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 GPU_ID="${GPU_ID:-2}"
 MODEL_DIR="${MODEL_DIR:-$ROOT_DIR/models/opt-2.7b}"
+PPL_MODEL_NAME_OR_PATH="${PPL_MODEL_NAME_OR_PATH:-$MODEL_DIR}"
 PROMPTS_PATH="${PROMPTS_PATH:-$ROOT_DIR/course_project/data/prompts_c4_realnewslike_500.txt}"
 OUTPUT_PREFIX="${OUTPUT_PREFIX:-opt27b_fp32_c4_500_full}"
 DOWNLOAD_MODEL="${DOWNLOAD_MODEL:-0}"
@@ -39,6 +40,7 @@ echo "[info] Root: $ROOT_DIR"
 echo "[info] Python: $PYTHON_BIN"
 echo "[info] GPU: $GPU_ID"
 echo "[info] Model: $MODEL_DIR"
+echo "[info] PPL scorer: $PPL_MODEL_NAME_OR_PATH"
 echo "[info] Prompts: $PROMPTS_PATH"
 echo "[info] Output prefix: $OUTPUT_PREFIX"
 echo "[info] Download model: $DOWNLOAD_MODEL"
@@ -118,7 +120,7 @@ if [[ "$RUN_PPL" == "1" ]]; then
     --input_csv "$RESULTS_CSV" \
     --output_csv "$PPL_RESULTS_CSV" \
     --summary_md "$PPL_SUMMARY_MD" \
-    --model_name_or_path "$MODEL_DIR" \
+    --model_name_or_path "$PPL_MODEL_NAME_OR_PATH" \
     --use_gpu True \
     --load_fp16 False \
     --batch_size "$PPL_BATCH_SIZE"

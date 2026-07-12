@@ -1,5 +1,5 @@
 %!TeX program = xelatex
-\documentclass[12pt,a4paper,UTF8]{ctexart}
+\documentclass[a4paper,UTF8,zihao=5]{ctexart}
 
 \usepackage[left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm]{geometry}
 \usepackage{amsmath,amssymb}
@@ -21,6 +21,7 @@
 \urlstyle{tt}
 \setlength{\headheight}{15pt}
 \setlength{\emergencystretch}{3em}
+\linespread{1.0}\selectfont
 \pagestyle{fancy}
 \fancyhead[L]{信息安全技术}
 \fancyhead[C]{期末课程报告}
@@ -36,7 +37,6 @@
 
 \newcommand{\method}{CA-KL}
 \newcommand{\fullmethod}{CA-KL-CG}
-\newcommand{\codepath}[1]{\textcolor{blue!45!black}{\nolinkurl{#1}}}
 
 \begin{document}
 
@@ -67,7 +67,7 @@
 
     围绕这一问题，本文把工作分为“论文复现”和“方法改进”两个层次。复现实验先对齐原论文口径：使用 \texttt{facebook/opt-1.3b}、C4/realnewslike 500 条样本、论文风格 prompt 构造、200$\pm$5 个有效 scored tokens，以及 standard KGW detector。结果显示，\texttt{Fixed Delta 2.0} 的平均 z-score 达到 10.6006，检测成功率为 96.19\%，明显高于无水印文本的 $-0.2836$ 和 0.20\%；continuation PPL 也从 3.8492 上升到 4.9195，说明检测增强依然伴随质量代价。在此基础上，本文再实现并比较两类自适应水印方法：第一类是基于熵的 Adaptive Delta，根据 next-token 分布熵调整每一步偏置强度；第二类是本文重点采用的 \method{} Watermark，它在每一步通过 KL 散度预算约束加水印分布 $P'_t$ 与原始分布 $P_t$ 的距离，并在预算内选择最大可用偏置。\fullmethod{} 进一步引入 candidate-aware greenlist 与 confidence gate，使水印主要作用于候选空间内、模型分布更适合嵌入的位置。检测端实现模型辅助的 entropy-weighted detector 和 windowed detector，用 weighted z-score、WinMax weighted z-score、AUC 与 TPR@FPR 评价自适应水印信号。
 
-    在 500 条 \texttt{OPT-2.7B} 改进实验中，\method{} 在普通 KGW 检测器下的检测成功率为 95.60\%，高于 \texttt{Fixed Delta 2.0} 的 92.80\% 和 Adaptive Delta 的 88.60\%。\fullmethod{} 在 gate 0.10/0.95 下的普通 KGW 检测率为 88.80\%，PPL 为 5.6073；在 matched weighted/WinMax 检测器下，weighted z-score 为 9.1174，AUC 为 0.9992，TPR@1\%FPR 为 99.60\%。实验表明，KL 预算能够为水印强度提供可解释约束，而模型辅助加权检测能够更充分地利用自适应生成过程中留下的水印证据。
+    为避免模型规模、prompt 和采样条件混杂，改进方法另在与复现主表一致的控制变量下重跑：\texttt{OPT-1.3B}、499 个有效 C4/realnewslike prompt、200$\pm$5 token、相同采样参数与 standard KGW detector，且统一由未加水印 \texttt{OPT-2.7B} 评测 continuation PPL。\method{} 的平均 z-score 为 12.1205、检出率为 98.40\%，高于 \texttt{Fixed Delta 2.0} 的 10.6572 和 97.39\%，但 PPL 从 5.7426 增至 6.3104；\fullmethod{} 以 69.44\% 的位置施加偏置，将 PPL 降至 6.1984，同时保持 97.19\% 的普通 KGW 检出率。进一步的 KL 预算扫描显示，随 $\varepsilon$ 从 0.20 增至 0.50，\method{} 的普通检出率从 67.80\% 增至 95.40\%，但 PPL 也从 4.8395 增至 5.8431；在相近 PPL 比较中，尚不能证明其严格 Pareto 支配固定偏置。copy-paste 攻击中，当 \fullmethod{} 的水印片段只占全文 25\% 时，WinMax 的诊断 TPR@1\%FPR 为 88.60\%，高于 global weighted 的 61.33\% 和 standard KGW 的 43.07\%，支持局部窗口检测的设计动机。
 
     \noindent\textbf{关键词：}大语言模型；文本水印；信息安全；KL 散度；加权检测；内容溯源
 \end{abstract}
@@ -114,7 +114,7 @@ KGW 方法的核心是 seeded greenlist。设词表大小为 $|\mathcal{V}|$，�
 
 \subsection{官方仓库与复现环境}
 
-复现工作从官方仓库 \codepath{jwkirchenbauer/lm-watermarking} 开始。这个仓库包含 \codepath{demo_watermark.py}、\codepath{watermark_processor.py}、\codepath{extended_watermark_processor.py}、\codepath{normalizers.py} 和 \codepath{alternative_prf_schemes.py} 等核心文件，其中最关键的是 \codepath{watermark_processor.py}，它实现了基础 KGW 水印生成器和检测器。图~\ref{fig:official-repo} 展示了复现所使用的官方仓库页面，后续课程代码也是在该仓库结构上整理出来的。
+复现工作以官方开源实现为基础。其核心生成模块在每一步依据 prefix 构造 greenlist 并施加固定偏置，检测模块按照相同密钥规则重建 greenlist 并输出 green token 数量、green fraction、z-score、p-value 和最终预测。图~\ref{fig:official-repo} 展示了复现所使用的官方仓库页面，后续课程实现沿用其生成--检测一致性的基本结构。
 
 \begin{figure}[H]
     \centering
@@ -127,25 +127,7 @@ KGW 方法的核心是 seeded greenlist。设词表大小为 $|\mathcal{V}|$，�
 
 \subsection{原始复现步骤}
 
-官方复现按照“仓库准备、依赖安装、模型下载、Demo 启动、结果验证”的顺序完成。复现阶段先用最小模型跑通完整链路，以便提前暴露 Gradio、Transformers 和本地模型路径的问题。核心命令如下：
-
-\begin{lstlisting}[language=bash]
-git clone https://github.com/jwkirchenbauer/lm-watermarking.git
-cd lm-watermarking
-conda create -n inform python=3.10 -y
-conda activate inform
-pip install -r requirements.txt
-\end{lstlisting}
-
-模型准备完成后，使用本地 tiny-gpt2 启动官方 Gradio Demo：
-
-\begin{lstlisting}[language=bash]
-python demo_watermark.py \
-  --model_name_or_path ./models/tiny-gpt2 \
-  --use_gpu True \
-  --run_gradio True \
-  --max_new_tokens 100
-\end{lstlisting}
+官方复现按照“代码准备、依赖安装、模型下载、Demo 启动、结果验证”的顺序完成。复现阶段先用最小模型跑通完整链路，以便提前暴露 Gradio、Transformers 和模型加载接口的兼容性问题；随后使用本地模型启动官方 Gradio Demo，验证生成、检测和可视化链路。
 
 复现过程中遇到的一个实际问题是 Gradio 版本兼容。官方旧代码中使用的 \texttt{demo.queue(concurrency\_count=3)} 在新版 Gradio 中已经不再兼容，启动时会报参数错误。将其改为 \texttt{demo.queue(default\_concurrency\_limit=3)} 后，前端页面可以正常打开。该修复本身不改变水印算法，只是让官方交互式 Demo 能在当前环境下运行。图~\ref{fig:official-demo-start} 展示了官方 Demo 正常启动后的界面。
 
@@ -179,11 +161,19 @@ python demo_watermark.py \
 
 \subsection{基于熵的 Adaptive Delta}
 
-Adaptive Delta 方法利用 next-token 分布熵刻画当前位置的生成不确定性。设当前分布的归一化熵为 $H_{\text{norm}}$，水印偏置由如下经验函数给出：
+Adaptive Delta 方法利用 next-token 分布熵刻画当前位置的生成不确定性。对词表大小 $|V|$ 和原始 next-token 分布 $p_t$，实现中的归一化熵为
+\[
+H_{\text{norm}}=-\frac{\sum_{v\in V}p_t(v)\log p_t(v)}{\log |V|}\in[0,1].
+\]
+当前实现固定 $\delta_{\min}=0.5$、$\delta_{\max}=3.0$、熵下界 $h_0=0.20$ 和指数 $\alpha=0.5$，并使用截断的凹映射
+\[
+f(H_{\text{norm}})=\bigl(\max(H_{\text{norm}},h_0)\bigr)^\alpha.
+\]
+因此水印偏置为：
 \[
     \delta_t=\delta_{\min}+(\delta_{\max}-\delta_{\min})\cdot f(H_{\text{norm}}).
 \]
-该方法比固定 \texttt{delta} 更灵活，也具有直观解释：高熵位置有更多合理候选，适合使用更强水印；低熵位置更确定，适合使用较小偏置。
+该映射先将熵截断到 $h_0$，再用 $\alpha<1$ 提升中等熵位置的偏置；最终值天然落在 $[\delta_{\min},\delta_{\max}]$ 内。它比固定 \texttt{delta} 更灵活，也具有直观解释：高熵位置有更多合理候选，适合使用更强水印；低熵位置更确定，适合使用较小偏置。
 
 Adaptive Delta 的不足在于，熵到 \texttt{delta} 的映射仍然依赖经验参数，难以直接说明某个熵值对应某个具体偏置的分布意义。此外，若检测端仍然使用原始 KGW detector，则检测统计量没有显式利用生成端的可嵌入性差异。本文将 Adaptive Delta 作为重要对照方法，并进一步引入 KL 约束来重新定义每一步允许施加的水印强度。
 
@@ -205,7 +195,17 @@ Adaptive Delta 的不足在于，熵到 \texttt{delta} 的映射仍然依赖经�
 \[
     D_{\mathrm{KL}}(P'_t\|P_t)=\delta q_G-\log Z.
 \]
-本文选择满足 KL 预算的最大 $\delta_t$。这样一来，水印强度不再由熵的经验映射给出，而是由当前分布和 KL 预算共同决定。小规模网格实验显示，$\varepsilon=0.02$ 时平均 \texttt{delta} 过低，检测信号不足；$\varepsilon=0.50$ 能使水印信号进入稳定可检出区间。在 500 条 OPT-2.7B fp32 实验中，\method{} 的平均自适应 \texttt{delta} 为 2.5108，既能形成明显水印痕迹，也保留了分布约束的解释。
+本文选择满足 KL 预算的最大 $\delta_t$。完整生成步骤为：先由当前 prefix 得到原始 logits 与 $P_t$；按 KGW 密钥构造 greenlist；计算 $p_G$；用 16 次二分搜索求满足预算的最大 $\delta_t$；将该偏置只加到 green token logits；最后按原采样参数采样 token。这样一来，水印强度不再由熵的经验映射给出，而是由当前分布和 KL 预算共同决定。小规模网格实验显示，$\varepsilon=0.02$ 时平均 \texttt{delta} 过低，检测信号不足；$\varepsilon=0.50$ 能使水印信号进入稳定可检出区间。在 500 条 OPT-2.7B fp32 实验中，\method{} 的平均自适应 \texttt{delta} 为 2.5108，既能形成明显水印痕迹，也保留了分布约束的解释。
+
+\subsection{Candidate-aware Greenlist 与 Confidence Gate}
+
+Candidate-aware Greenlist 不再直接在全词表中选 green token。实现先按 $P_t$ 从高到低排序，取累计概率首次达到 top-$p=0.95$ 的候选集合 $C_t$；再按与原 KGW 相同的 prefix seed 置乱整个词表，并保留其中属于 $C_t$ 的 token。greenlist 在候选集合内部按同一比例 $\gamma=0.25$ 取前 $\lfloor\gamma |C_t|\rfloor$ 个；若候选集合非空但该值为零，则退化为选取一个 token。候选集合外 token 不接收 logits 偏置，原 KGW 的密钥和置乱关系仍被保留。
+
+Confidence Gate 的实际条件为
+\[
+H_{\mathrm{norm}}\ge H_{\min}\quad\text{且}\quad p_{\mathrm{top1}}\le p_{\max}.
+\]
+正式 CA-KL-CG 采用 $(H_{\min},p_{\max})=(0.10,0.95)$。任一条件不满足时，该位置直接取 $\delta_t=0$，而不是使用较小偏置；满足条件时才执行上述 KL 二分搜索。这一设计将低熵或单一候选占主导的位置排除在嵌入之外。
 
 \subsection{加权检测器的作用}
 
@@ -218,27 +218,70 @@ Adaptive Delta 的不足在于，熵到 \texttt{delta} 的映射仍然依赖经�
     Z_w=\frac{\sum_i w_i(G_i-p_i)}
     {\sqrt{\sum_i w_i^2p_i(1-p_i)}}.
 \]
-其中 $G_i$ 表示第 $i$ 个生成 token 是否落入 greenlist，$p_i$ 是无水印条件下落入该 greenlist 的概率质量，$w_i$ 是由当前 prefix 分布计算出的权重。由于 $w_i$ 只依赖当前 token 之前的 prefix，不依赖当前 token 是否命中 greenlist，这个统计量在无水印文本下仍然有合理的零均值解释。
+其中 $G_i$ 表示第 $i$ 个生成 token 是否落入 greenlist，$p_i$ 是无水印条件下落入该 greenlist 的概率质量。实现取 $w_i=H_{\mathrm{norm},i}$；若该位置未通过 Confidence Gate，则令 $w_i=0$。权重未作额外归一化。由于 $w_i$ 只依赖当前 token 之前的 prefix，不依赖当前 token 是否命中 greenlist，这个统计量在无水印文本下仍然有合理的零均值解释。
 
-此外，本文还实现了 windowed detector，即在多个窗口长度上计算局部加权 z-score，并取最大值。这个设计主要面向 copy-paste 混入场景：如果一段带水印文本被插入到大量无水印文本中，全局统计量会被稀释，而窗口检测可以更容易发现局部水印片段。
+此外，本文还实现了 windowed detector，即在每个连续窗口上计算局部加权 z-score，并取最大值：$Z_{\mathrm{WinMax}}=\max_{L\in\{20,40,80,\mathrm{max}\}}\max_s Z_w[s:s+L]$。这个设计主要面向 copy-paste 混入场景：如果一段带水印文本被插入到大量无水印文本中，全局统计量会被稀释，而窗口检测可以更容易发现局部水印片段。由于多窗口最大化会提高误报机会，WinMax 绝不能复用 weighted detector 的阈值；两种分数均须在独立 No Watermark 校准集上单独确定阈值。
 
 \section{实现细节}
 
-代码实现主要增加了三个部分。第一，\codepath{course_project/processors/cakl_watermark_processor.py} 中实现了 CA-KL 生成器，负责 KL-constrained adaptive delta、confidence gate 和 candidate-aware greenlist。第二，同一文件中实现了模型辅助检测器，负责 weighted z-score 和 WinMax weighted z-score。第三，\codepath{course_project/scripts/run_experiments.py} 被扩展为批量实验入口，用于比较 \texttt{No Watermark}、多个固定 \texttt{delta}、Adaptive Delta、\method{} 生成、\method{} + Candidate Greenlist 生成，以及 \fullmethod{} 生成在普通 KGW 检测器和加权检测器下的表现。
+\subsection{项目结构与模块职责}
 
-实现中保持三个原则。首先，模型不做 fine-tuning，所有水印都在 inference-time 修改 logits，以保持方法与原论文设定一致。其次，保留普通 KGW 检测器，用于和固定 \texttt{delta} baseline 做同口径比较；模型辅助加权检测器则作为匹配 \method{} 和 \fullmethod{} 的增强检测口径。最后，结果分析脚本同时输出平均 z-score、普通检测成功率、AUC、TPR@1\%FPR、TPR@5\%FPR、平均 KL 和平均自适应 \texttt{delta} 等指标。
+代码实现主要增加了三个部分。第一，生成与检测模块实现 CA-KL 生成器，负责 KL-constrained adaptive delta、confidence gate 和 candidate-aware greenlist。第二，该模块同时实现模型辅助检测器，负责 weighted z-score 和 WinMax weighted z-score。第三，批量实验模块统一执行 \texttt{No Watermark}、多个固定 \texttt{delta}、Adaptive Delta、\method{} 生成、\method{} + Candidate Greenlist 生成，以及 \fullmethod{} 生成，并分别记录普通 KGW 检测器和加权检测器的结果。
 
-核心实验脚本如下，分别对应完整 baseline 对比、confidence gate 网格、选定 gate 下的 \method{} 系列实验，以及 \texttt{Fixed Delta 1.7} 对照实验：
-\begin{lstlisting}[language=bash]
-bash course_project/scripts/run_opt27b_full_500_fp32.sh
-bash course_project/scripts/run_opt27b_gate_grid_fp32.sh
-bash course_project/scripts/run_opt27b_full_500_fp32_gate010_095.sh
-bash course_project/scripts/run_opt27b_fixed17_500_fp32.sh
-\end{lstlisting}
+\begin{table}[H]
+    \centering
+    \caption{改进实验的功能模块与职责}
+    \label{tab:code-structure}
+    \small
+    \begin{tabularx}{\textwidth}{p{0.48\textwidth}X}
+        \toprule
+        功能模块 & 作用 \\
+        \midrule
+        生成与检测模块 & CA-KL 生成、候选 greenlist、gate 与模型辅助检测 \\
+        批量实验模块 & 统一生成、普通 KGW 检测，保存 prompt、文本与精确 token ids \\
+        KL 预算扫描模块 & 500 条 KL 预算扫描、PPL 与校准 \\
+        局部混入攻击模块 & token 级局部混入攻击及三种检测器评分 \\
+        校准统计模块 & 五折阈值校准与 2000 次 bootstrap 置信区间 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{统一实验与结果记录}
+
+实现中保持三个原则。首先，模型不做 fine-tuning，所有水印都在 inference-time 修改 logits，以保持方法与原论文设定一致。其次，保留普通 KGW 检测器，用于和固定 \texttt{delta} baseline 做同口径比较；模型辅助加权检测器则作为匹配 \method{} 和 \fullmethod{} 的增强检测口径。最后，结果分析脚本同时输出平均 z-score、普通检测成功率、AUC、TPR@1\%FPR、TPR@5\%FPR、平均 KL 和平均自适应 \texttt{delta} 等指标。每条新生成记录保存 \texttt{prompt\_id}、prompt、生成文本、精确 \texttt{token\_ids} 和检测分数；PPL 结果单独保存 continuation NLL 与 token 数，便于重新汇总而不覆盖原 CSV。
+
+\subsection{可复现运行与断点续跑}
+
+实验由统一的批处理入口执行，分别覆盖完整 baseline 对比、confidence gate 网格、选定 gate 下的 \method{} 系列、\texttt{Fixed Delta 1.7} 对照、KL 预算扫描与 copy-paste 攻击。每个任务均支持按已完成样本续跑，生成记录、PPL 记录、校准结果和图表输出分开保存。
+
+为展示改进方法的实际运行效果，前端在同一 prompt 下同步生成无水印、Fixed Delta、\method{} 和 \fullmethod{} 文本，并即时计算标准 KGW、Weighted 和 WinMax 指标。图~\ref{fig:frontend-baseline} 展示输入 prompt 后的无水印与固定偏置输出；图~\ref{fig:frontend-cakl} 展示 \method{} 与 \fullmethod{} 的生成文本及逐条扰动统计；图~\ref{fig:frontend-summary} 汇总四种方法的即时检测结果。该前端用于呈现单条生成--检测流程，正式比较仍以第 6 节的 499 条 prompt 汇总与独立校准为准。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.96\textwidth]{frontend_baseline_comparison.png}
+    \caption{前端中无水印与 Fixed Delta 的单条生成和标准 KGW 检测结果}
+    \label{fig:frontend-baseline}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.96\textwidth]{frontend_cakl_comparison.png}
+    \caption{前端中 CA-KL 与 CA-KL-CG 的生成、检测和扰动统计}
+    \label{fig:frontend-cakl}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.96\textwidth]{frontend_detection_summary.png}
+    \caption{前端对四种生成策略的即时检测汇总}
+    \label{fig:frontend-summary}
+\end{figure}
 
 \section{实验设置}
 
-为了先回答“我们是否严格复现了原论文”，再回答“我们在此基础上做了什么改进”，本报告把实验拆成两层。第一层是严格对齐原论文口径的 KGW 复现实验：使用 \texttt{facebook/opt-1.3b}、C4/realnewslike、500 条固定随机种子打乱后抽取的 prompt、论文风格的 prompt 构造，以及 200$\pm$5 个有效 scored tokens 的生成长度控制，并仅采用 standard KGW detector。第二层才是本文改进方法实验：使用 \texttt{facebook/opt-2.7b}、500 条样本、普通 KGW detector 与匹配 weighted detector，系统比较 Adaptive Delta、\method{} 和 \fullmethod{}。
+\subsection{原论文复现实验}
+
+本报告把实验拆成两层。第一层是严格对齐原论文口径的 KGW 复现实验：使用 \texttt{facebook/opt-1.3b}、C4/realnewslike、500 条固定随机种子打乱后抽取的 prompt、论文风格的 prompt 构造，以及 200$\pm$5 个有效 scored tokens 的生成长度控制，并仅采用 standard KGW detector。第二层才是本文改进方法实验：使用 \texttt{facebook/opt-2.7b}、500 条样本、普通 KGW detector 与匹配 weighted detector，系统比较 Adaptive Delta、\method{} 和 \fullmethod{}。
 
 \begin{table}[H]
     \centering
@@ -257,11 +300,25 @@ bash course_project/scripts/run_opt27b_fixed17_500_fp32.sh
         水印比例参数    & $\gamma=0.25$                                                            \\
         正式水印线     & \texttt{Fixed Delta 2.0}                                                 \\
         检测口径      & standard KGW detector，z-score threshold = 4.0                            \\
-        PPL 评分    & 使用无水印 \texttt{OPT-1.3B} 仅对 continuation 评分                               \\
+        PPL 评分    & 使用无水印 \texttt{OPT-2.7B} 仅对 continuation 评分                               \\
         硬件        & 共享服务器单卡 GPU                                                              \\
         \bottomrule
     \end{tabularx}
 \end{table}
+
+\subsection{受控改进方法比较}
+
+为检验改进而非模型规模或 prompt 差异的影响，受控改进实验固定 OPT-1.3B、上述 500 条 paper-style prompt、200$\pm$5 tokens、temperature 0.7、$\gamma=0.25$、FP32 与 standard KGW detector，只改变水印强度控制机制。PPL 统一由无水印 OPT-2.7B 对 continuation 评分，以避免评价器随生成方法改变。比较对象包括 No Watermark、Fixed Delta 2.0、Adaptive Delta、\method{}、Candidate Greenlist 和 \fullmethod{}。
+
+\subsection{Pareto 与消融实验}
+
+扩展实验在 OPT-2.7B 上扫描 $\varepsilon\in\{0.20,0.30,0.35,0.40,0.50\}$，并保留 Fixed Delta 曲线，以分析 KL 预算的质量--检测控制关系。Candidate Greenlist 与 confidence gate 的作用通过相同 prompt 上的消融、gate 网格和逐位置 \texttt{delta} 统计进行分析；这些结果作为机制分析，而非替代第 5.2 节的受控主比较。
+
+\subsection{鲁棒性与校准实验}
+
+鲁棒性实验将已有生成结果在 token 级拼接为 200-token copy-paste 攻击，覆盖 0/25/50/75/100\% 水印比例与 beginning/middle/end 插入位置。独立校准实验按 \texttt{prompt\_id} 五折划分：每折以 400 条 No Watermark 样本确定阈值，在剩余 100 条负样本和同索引水印文本上评估，并采用 2000 次 bootstrap 给出 95\% 置信区间。
+
+\subsection{评价指标}
 
 评价指标分为三类。第一类是原始 KGW 检测指标，包括 green fraction、普通 z-score 和普通 detection success rate；其中 success rate 指文本在原始 KGW 检测器下被判定为 \texttt{Watermarked} 的比例。第二类是文本质量指标，包括 continuation PPL、Distinct-1、Distinct-2 和 Repetition Rate；PPL 越低说明生成文本越接近原模型分布，Distinct 越高通常说明文本越不重复，Repetition Rate 越低说明词汇重复越少。第三类是匹配自适应生成机制的增强检测指标，包括 Weighted z-score、WinMax Weighted z-score、AUC 和 TPR@FPR。这三类指标回答的问题不同：普通 KGW 指标衡量与原论文检测器的兼容性，加权检测指标衡量模型辅助检测是否能捕捉自适应水印信号，质量指标衡量生成扰动带来的副作用。
 
@@ -302,53 +359,34 @@ bash course_project/scripts/run_opt27b_fixed17_500_fp32.sh
     \label{fig:paper-green}
 \end{figure}
 
-\subsection{改进方法结果}
+\subsection{原论文控制变量下的改进方法}
 
 \begin{table}[H]
     \centering
-    \caption{OPT-2.7B + C4/realnewslike 500 条样本上的改进方法结果}
+    \caption{控制变量下的改进方法比较：OPT-1.3B、499 个有效 C4/realnewslike prompt、200$\pm$5 token；PPL 统一由 OPT-2.7B 评测}
     \label{tab:improved-results}
     \scriptsize
     \setlength{\tabcolsep}{2.5pt}
-    \begin{tabularx}{\textwidth}{p{0.30\textwidth}rrrrrr}
+    \begin{tabularx}{\textwidth}{p{0.31\textwidth}rrrrrr}
         \toprule
-        生成方法                         & KGW z            & KGW 检出率          & Corpus PPL      & 平均 $\delta$ & Distinct-1      & 重复率             \\
+        生成方法                         & KGW z            & KGW 检出率          & Corpus PPL      & 平均 KL       & 平均 $\delta$ & 重复率             \\
         \midrule
-        No Watermark                 & -0.3780          & 0.20\%           & \textbf{4.1244} & --          & 0.6998          & 0.3002          \\
-        Fixed Delta 1.0              & 2.9412           & 25.40\%          & 4.4996          & 1.0000      & 0.7031          & 0.2969          \\
-        Fixed Delta 1.7              & 5.5349           & 82.00\%          & 4.9519          & 1.7000      & 0.6981          & 0.3019          \\
-        Fixed Delta 1.864            & 6.3353           & 89.60\%          & 5.2054          & 1.8640      & 0.6967          & 0.3033          \\
-        Fixed Delta 2.0              & 6.8200           & 92.80\%          & 5.4301          & 2.0000      & 0.6935          & 0.3065          \\
-        Fixed Delta 3.0              & \textbf{10.0975} & \textbf{98.40\%} & 7.0199          & 3.0000      & 0.6958          & 0.3042          \\
-        Adaptive Delta               & 6.2743           & 88.60\%          & 5.1528          & --          & 0.7037          & 0.2963          \\
-        \method{}                    & 7.5682           & 95.60\%          & 5.8167          & 2.5108      & 0.7022          & 0.2978          \\
-        CA-KL + Candidate Greenlist  & 6.8102           & 92.40\%          & 6.0565          & 2.4861      & \textbf{0.7086} & \textbf{0.2914} \\
-        \fullmethod{}，gate 0.10/0.95 & 6.3873           & 88.80\%          & 5.6073          & 1.6893      & 0.7057          & 0.2943          \\
+        No Watermark                 & -0.1264          & 1.00\%           & \textbf{4.5207} & --          & --          & \textbf{0.4413} \\
+        Fixed Delta 2.0              & 10.6572          & 97.39\%          & 5.7426          & --          & 2.0000      & 0.4709          \\
+        Adaptive Delta               & 9.9697           & 96.79\%          & 5.5995          & --          & --          & 0.4685          \\
+        \method{}                    & \textbf{12.1205} & \textbf{98.40\%} & 6.3104          & 0.3642      & 2.5401      & 0.4728          \\
+        \fullmethod{}，gate 0.10/0.95 & 10.4528          & 97.19\%          & 6.1984          & 0.3327      & 1.6304      & 0.4614          \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-\method{} 的普通检测成功率为 95.60\%，高于 \texttt{Fixed Delta 2.0} 的 92.80\% 和 Adaptive Delta 的 88.60\%；平均 z-score 也更高。这说明 KL 预算约束能够在不手动指定固定 \texttt{delta} 的情况下形成稳定的统计偏差。
+表 \ref{tab:improved-results} 在统一实验条件下报告五类具有代表性的生成策略：无水印文本用于估计标准 KGW 检测器的背景分数；Fixed Delta 2.0 对齐原始 KGW 的固定偏置设定；Adaptive Delta 检验基于熵的动态强度控制；\method{} 检验逐位置 KL 预算约束；\fullmethod{} 则同时考察 candidate-aware greenlist 与 confidence gate 对 KL 约束生成的影响。所有生成与普通检测均在相同的 499 个 prompt 上完成，PPL 则由独立的未加水印 OPT-2.7B 统一重算，因而方法间可直接比较。
 
-PPL 结果体现了检测强度与分布扰动之间的权衡。\texttt{Fixed Delta 3.0} 的 KGW 检测最强，PPL 为 7.0199；\texttt{Fixed Delta 2.0} 的 PPL 为 5.4301，检测率为 92.80\%；\method{} 的检测率进一步提高到 95.60\%，PPL 为 5.8167。由此可见，\method{} 的优势主要体现在 KL 预算约束下的动态强度控制和更高检测信号。
+\method{} 的普通 KGW z-score 和检出率最高，分别为 12.1205 和 98.40\%，但其 PPL 为 6.3104，高于 Fixed Delta 的 5.7426。加入 confidence gate 后，\fullmethod{} 的平均 \texttt{delta} 从 2.5401 降至 1.6304，实际施加水印的位置占 69.44\%，PPL 下降到 6.1984，而普通检出率仍为 97.19\%。这支持其作为“降低嵌入覆盖率的折中方案”，而非优于全部基线的严格 Pareto 支配方案。
 
-\fullmethod{} 使用 gate 0.10/0.95 后，平均 \texttt{delta} 为 1.6893，接近补充实验中的 \texttt{Fixed Delta 1.7}。在相近平均强度下，\fullmethod{} 的普通 KGW 检出率为 88.80\%，高于 \texttt{Fixed Delta 1.7} 的 82.00\%；PPL 为 5.6073。该结果说明，candidate-aware greenlist 和 confidence gate 能在较低平均偏置下保留可检测信号，并为后续模型辅助检测提供更集中的统计证据。
+按 \texttt{prompt\_id} 进行五折独立阈值校准时，\method{} 的 standard z-score AUC 为 0.9954，TPR@1\%FPR 为 98.40\%（实际 FPR 1.40\%）；\fullmethod{} 的对应值为 0.9926 和 97.19\%。因此，上述检测结论并非复用同一批负样本的阈值与评估，而是由每折未参与阈值确定的 No Watermark 样本评测得到。
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.86\textwidth]{cakl_zscore.png}
-    \caption{选定 gate 0.10/0.95 下 CA-KL 系列的平均 z-score 对比}
-    \label{fig:zscore}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.86\textwidth]{cakl_green.png}
-    \caption{选定 gate 0.10/0.95 下 CA-KL 系列的 green fraction 对比}
-    \label{fig:green}
-\end{figure}
-
-\subsection{Confidence Gate 参数分析}
+\subsection{扰动控制与门控参数消融}
 
 Confidence gate 控制 \fullmethod{} 的实际嵌入位置：只有当当前位置满足熵下界且 top-1 概率不超过给定阈值时，生成器才施加水印偏置。为了分析 gate 对水印强度的影响，实验比较了五组 $(H_{\text{norm}},p_{\text{top1}})$ 参数。结果见表 \ref{tab:gate-grid}。
 
@@ -373,7 +411,7 @@ Confidence gate 控制 \fullmethod{} 的实际嵌入位置：只有当当前位�
 
 表 \ref{tab:gate-grid} 表明，gate 越严格，平均 \texttt{delta}、gate 通过率和普通 KGW z-score 越低。0.10/0.95 在网格实验中取得最高的普通 KGW 检出率，并保持 96\% 的 weighted 检出率，因此作为 \fullmethod{} 的正式实验参数。
 
-\subsection{匹配自适应水印的加权检测结果}
+\subsection{匹配检测与独立阈值校准}
 
 由于 \method{} 和 \fullmethod{} 的生成强度是动态变化的，原始 z-score 只能反映一部分信息。普通 KGW 检测器默认所有位置等权，但 \fullmethod{} 会通过 candidate-aware greenlist 和 confidence gate 选择更适合嵌入的位置，因此检测端也应当利用这些位置差异。表 \ref{tab:weighted} 比较了 weighted z-score 和 WinMax weighted z-score 的结果。
 
@@ -399,7 +437,7 @@ Confidence gate 控制 \fullmethod{} 的实际嵌入位置：只有当当前位�
 
 \begin{table}[H]
     \centering
-    \caption{基于 No Watermark 负样本校准的加权检测质量}
+    \caption{同批 No Watermark 负样本上的初步加权检测质量（仅作诊断）}
     \label{tab:auc}
     \scriptsize
     \setlength{\tabcolsep}{2.5pt}
@@ -417,7 +455,27 @@ Confidence gate 控制 \fullmethod{} 的实际嵌入位置：只有当当前位�
     \end{tabularx}
 \end{table}
 
-表 \ref{tab:auc} 以 No Watermark 作为负样本校准阈值。从排序和低误报率检测的角度看，加权检测器具有很强的区分能力。\fullmethod{} 的 weighted z-score AUC 为 0.9992，TPR@1\%FPR 和 TPR@5\%FPR 均为 99.60\%；WinMax z-score AUC 为 0.9970，TPR@5\%FPR 为 99.20\%。这表明普通 KGW 检测率适合衡量与原论文检测器的兼容性，而 weighted AUC 和 TPR@FPR 更能反映自适应生成机制在匹配检测器下的可检出性。
+表 \ref{tab:auc} 使用同一批 No Watermark 分数确定阈值并计算 TPR，因此只保留为便于与旧实验对照的诊断结果，不能作为低误报率泛化性能的正式结论。下面采用按 \texttt{prompt\_id} 划分的独立五折校准结果替代该口径。
+
+对 500 条固定 prompt，本文以种子 1234 划分 5 折；每折仅用 400 条 No Watermark 分数分别为 KGW、weighted 和 WinMax 分数确定 99/95 分位阈值，再在剩余 100 条负样本上测量实际 FPR，并在相同 prompt id 的水印文本上计算 TPR。所有区间采用 2000 次 bootstrap 的 95\% 置信区间。表 \ref{tab:calibrated-final} 给出完整方案的 out-of-fold 结果；每折样本数为 100，因此实际 FPR 会围绕目标值以 1\% 的离散粒度波动。
+
+\begin{table}[H]
+    \centering
+    \caption{\fullmethod{} 的五折独立校准结果（500 条，95\% CI）}
+    \label{tab:calibrated-final}
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \begin{tabularx}{\textwidth}{p{0.14\textwidth}p{0.20\textwidth}p{0.20\textwidth}rp{0.20\textwidth}r}
+        \toprule
+        分数 & AUC（95\% CI） & TPR@1\%FPR（95\% CI） & 实际 FPR & TPR@5\%FPR（95\% CI） & 实际 FPR \\
+        \midrule
+        Weighted z & 0.9992 [0.9977, 1.0000] & 99.60\% [99.0\%, 100\%] & 1.40\% & 99.60\% [99.0\%, 100\%] & 5.20\% \\
+        WinMax z & 0.9970 [0.9931, 0.9996] & 98.20\% [96.8\%, 99.2\%] & 1.00\% & 99.20\% [98.4\%, 99.8\%] & 5.20\% \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\fullmethod{} 的 continuation PPL bootstrap 估计为 5.6037，95\% CI 为 [5.3892, 5.8100]；对应 No Watermark 为 4.1253 [4.0054, 4.2552]。因此，现有结果支持“匹配检测器对该生成文本具有较强区分能力”，但不应将同批校准的初步表述为严格的目标 FPR；后续 Pareto 与 copy-paste 实验沿用相同的交叉校准脚本。
 
 \begin{figure}[H]
     \centering
@@ -433,7 +491,7 @@ Confidence gate 控制 \fullmethod{} 的实际嵌入位置：只有当当前位�
     \label{fig:tradeoff}
 \end{figure}
 
-\subsection{KL 预算与自适应强度分析}
+\subsection{KL 预算扫描、Pareto 与局部混入鲁棒性}
 
 KL 预算 $\varepsilon$ 直接控制每一步允许的分布扰动。小规模网格实验比较了 $\varepsilon=0.30,0.35,0.40,0.50$；当 $\varepsilon$ 过小时，平均 \texttt{delta} 较低，水印信号不足。$\varepsilon=0.50$ 能使 \method{} 的平均 \texttt{delta} 接近 2.5，检测率进入稳定区间，因此正式实验采用该参数。在 500 条样本上，\method{} 的平均 \texttt{delta} 为 2.5108，CA-KL + Candidate Greenlist 为 2.4861，而加入 gate 后的 \fullmethod{} 降到 1.6893。
 
@@ -446,15 +504,135 @@ KL 预算 $\varepsilon$ 直接控制每一步允许的分布扰动。小规模�
 
 KL 预算和 confidence gate 共同决定最终扰动强度。预算越大，可用偏置上界越高；gate 越严格，实际施加偏置的位置越少。\fullmethod{} 在 gate 0.10/0.95 下的平均 \texttt{delta} 约为 1.69，低于 \method{} 的 2.51，但在 weighted detector 下仍保持较高检测分数。这说明 KL 预算负责约束单步分布扰动，confidence gate 负责筛选适合嵌入的位置，两者共同构成完整的自适应水印强度控制机制。
 
+为避免只以平均 \texttt{delta} 推断质量--检测折中，本文在相同 500 条 C4/realnewslike prompt、相同采样设置下扫描 $\varepsilon\in\{0.20,0.30,0.35,0.40,0.50\}$。表 \ref{tab:pareto-full} 的 KL、\texttt{delta} 和分位数均来自逐生成位置的真实记录；P25/P50/P75 为先在单条序列内计算、再在样本间平均的分位数。
+
+\begin{table}[H]
+    \centering
+    \caption{500 条 prompt 上 Fixed Delta 与 CA-KL 的质量--检测比较}
+    \label{tab:pareto-full}
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \begin{tabularx}{\textwidth}{p{0.24\textwidth}rrrrrr}
+        \toprule
+        方法 / 参数 & PPL$\downarrow$ & KGW 检出率$\uparrow$ & 平均 z & 平均 KL & 平均 $\delta$ & P25/P50/P75 \\
+        \midrule
+        Fixed $\delta=1.0$ & 4.4996 & 25.40\% & 2.941 & -- & 1.000 & 1.000/1.000/1.000 \\
+        Fixed $\delta=1.7$ & 4.9519 & 82.00\% & 5.535 & -- & 1.700 & 1.700/1.700/1.700 \\
+        Fixed $\delta=1.864$ & 5.2054 & 89.60\% & 6.335 & -- & 1.864 & 1.864/1.864/1.864 \\
+        Fixed $\delta=2.0$ & 5.4301 & 92.80\% & 6.820 & -- & 2.000 & 2.000/2.000/2.000 \\
+        \method{} $\varepsilon=0.20$ & 4.8395 & 67.80\% & 4.528 & 0.1666 & 1.884 & 1.387/1.630/2.319 \\
+        \method{} $\varepsilon=0.30$ & 5.2778 & 84.80\% & 5.643 & 0.2432 & 2.130 & 1.668/1.919/2.628 \\
+        \method{} $\varepsilon=0.35$ & 5.4544 & 89.20\% & 6.307 & 0.2797 & 2.235 & 1.804/2.057/2.723 \\
+        \method{} $\varepsilon=0.40$ & 5.7354 & 91.60\% & 6.837 & 0.3172 & 2.328 & 1.920/2.172/2.809 \\
+        \method{} $\varepsilon=0.50$ & 5.8431 & 95.40\% & 7.558 & 0.3836 & 2.510 & 2.155/2.424/2.943 \\
+        \fullmethod{} $\varepsilon=0.50$ & 5.6073 & 88.80\% & 6.387 & 0.3481 & 1.689 & -- \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+图 \ref{fig:pareto-kgw} 表明，随着预算增加，CA-KL 沿着“更高 PPL--更高检出率”方向连续移动；图 \ref{fig:epsilon-curves} 验证平均实际 KL 与平均 \texttt{delta} 均单调增加。更重要的是，CA-KL 没有在当前设置下严格 Pareto 支配 Fixed Delta：$\varepsilon=0.20$ 的 PPL 为 4.8395、检出率为 67.80\%，低于 PPL 相近的 Fixed $\delta=1.7$ 的 82.00\%；$\varepsilon=0.35$ 的 PPL 为 5.4544、检出率为 89.20\%，也未同时优于 Fixed $\delta=1.864$。因此，实验支持“KL 预算提供可解释的连续控制”，但不支持“其在所有质量约束下优于固定偏置”的更强断言。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{pareto_ppl_kgw.pdf}
+    \caption{PPL--普通 KGW 检出率 Pareto 图}
+    \label{fig:pareto-kgw}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{pareto_epsilon_delta.pdf}
+        \caption{$\varepsilon$--平均 \texttt{delta}}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{pareto_epsilon_kl.pdf}
+        \caption{$\varepsilon$--平均实际 KL}
+    \end{subfigure}
+    \caption{KL 预算与自适应强度关系}
+    \label{fig:epsilon-curves}
+\end{figure}
+
+\noindent\textbf{Copy-paste 局部混入攻击。}
+
+本文直接复用已有生成文本，在 token 级构造固定 200 scored tokens 的攻击样本：无水印前缀、指定比例的水印片段和无水印后缀，并设置 beginning、middle、end 三个插入位置。对 Fixed Delta 2.0、\method{} 和 \fullmethod{} 各构造 500 条样本、五个比例和三个位置，共评分 22,500 条攻击文本；WinMax 使用默认窗口集合 $\{20,40,80,\mathrm{max}\}$。
+
+表 \ref{tab:copy-paste} 合并三个插入位置。为保持攻击构造一致，表中 TPR@1\%FPR 由同构 0\% 攻击负样本得到，属于诊断值，不能替代前述五折独立校准；固定阈值检测率和分数曲线直接体现了水印信号被无水印文本稀释的程度。
+
+\begin{table}[H]
+    \centering
+    \caption{Copy-paste 攻击下的 TPR@1\%FPR 诊断值（位置合并，1,500 条/比例）}
+    \label{tab:copy-paste}
+    \small
+    \begin{tabularx}{\textwidth}{p{0.30\textwidth}rrrr}
+        \toprule
+        生成方法 & 水印占比 & Standard KGW & Global Weighted & WinMax \\
+        \midrule
+        Fixed Delta 2.0 & 25\% & 46.27\% & 69.80\% & 95.13\% \\
+        \method{} & 25\% & 54.13\% & 74.67\% & 94.67\% \\
+        \fullmethod{} & 25\% & 43.07\% & 61.33\% & 88.60\% \\
+        Fixed Delta 2.0 & 50\% & 95.13\% & 97.13\% & 99.00\% \\
+        \method{} & 50\% & 96.33\% & 97.27\% & 99.00\% \\
+        \fullmethod{} & 50\% & 91.93\% & 95.47\% & 97.60\% \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+水印比例从 100\% 降至 25\% 时，global detector 的分数与检出率明显下降，WinMax 的下降更慢。以 \fullmethod{} 为例，25\% 时 standard/global/WinMax 的平均分数为 1.892/2.628/5.551，WinMax TPR 为 88.60\%，高于 global 和 standard 的 61.33\% 与 43.07\%。在水印片段位于中间时，\fullmethod{} 的 WinMax TPR 仍为 90.20\%，说明该优势并非只来自文本起始位置。多窗口搜索的代价是需要独立校准：本攻击构造下无水印文本的 WinMax 固定阈值误报约为 0.33\%。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{copy_paste_tpr1.pdf}
+    \caption{水印占比与 WinMax TPR@1\%FPR 诊断值}
+    \label{fig:copy-tpr}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{copy_paste_weighted.pdf}
+        \caption{Global weighted 分数}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{copy_paste_winmax.pdf}
+        \caption{WinMax 分数}
+    \end{subfigure}
+    \caption{水印占比与两类模型辅助检测分数}
+    \label{fig:copy-scores}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.86\textwidth]{copy_paste_position.pdf}
+    \caption{25\% 水印占比下不同插入位置的 WinMax TPR@1\%FPR 诊断值}
+    \label{fig:copy-position}
+\end{figure}
+
 \section{总结}
 
 本报告完成了 KGW 文本水印方法的复现，并在固定 \texttt{delta} 的基础上实现了两类自适应水印机制。Adaptive Delta 通过 next-token 分布熵调整偏置强度，提供了直观的可嵌入性建模；\method{} 则进一步使用 KL 散度预算约束每一步分布扰动，使水印强度具有明确的统计解释。\fullmethod{} 在此基础上加入 candidate-aware greenlist 和 confidence gate，把水印嵌入集中到候选空间内更合适的位置。
 
 首先，主表已经前置为 \texttt{OPT-1.3B + C4/realnewslike + 200$\pm$5 tokens + standard KGW detector} 的复现实验。两条线的平均 \texttt{tokens\_scored} 分别为 203.82 和 203.96，说明生成长度控制已经回到原论文量级；\texttt{Fixed Delta 2.0} 的 z-score 达到 10.6006、检出率达到 96.19\%，同时 continuation PPL 从 3.8492 上升到 4.9195。这一组结果更准确地回答了“我们本地是否真的复现了官方实验”这个问题，也说明此前与原论文差距较大的关键原因，确实包括模型规模、prompt 构造方式和生成长度控制不一致。
 
-其次，500 条 OPT-2.7B fp32 改进实验表明，\method{} 在普通 KGW 检测器下的检出率为 95.60\%，高于 \texttt{Fixed Delta 2.0} 的 92.80\% 和 Adaptive Delta 的 88.60\%，说明 KL 约束水印能够形成稳定检测信号。\fullmethod{} 在 gate 0.10/0.95 下的普通 KGW 检出率为 88.80\%，PPL 为 5.6073，平均 \texttt{delta} 为 1.6893；与平均强度接近的 \texttt{Fixed Delta 1.7} 相比，普通 KGW 检出率从 82.00\% 提升到 88.80\%。在模型辅助 weighted/WinMax detector 下，\fullmethod{} 的 weighted z-score AUC 达到 0.9992，TPR@1\%FPR 达到 99.60\%，表明自适应生成留下的水印证据可以被匹配检测器稳定捕捉。
+其次，改进方法已按原论文控制变量重新运行：相同的 OPT-1.3B、499 个有效 C4/realnewslike prompt、200$\pm$5 token 与 standard KGW detector，PPL 统一由 OPT-2.7B 评测。\method{} 的普通 KGW z-score 为 12.1205、检出率为 98.40\%，高于 \texttt{Fixed Delta 2.0} 的 10.6572 和 97.39\%，代价是 PPL 从 5.7426 升至 6.3104。\fullmethod{} 将嵌入位置压缩到 69.44\%，PPL 为 6.1984、检出率为 97.19\%。五折独立校准下，\method{} 的 standard z-score AUC 为 0.9954、TPR@1\%FPR 为 98.40\%，实际 FPR 为 1.40\%。这说明 KL 约束更擅长增强检测信号；confidence gate 则提供了降低平均扰动的折中，而非严格 Pareto 支配。
 
-综上，本文的主要贡献包括：第一，复现并系统比较固定 \texttt{delta}、Adaptive Delta、\method{} 和 \fullmethod{}；第二，提出 KL 预算下的动态水印强度控制机制，使每一步 \texttt{delta} 由分布扰动约束决定；第三，实现 candidate-aware greenlist、confidence gate 与模型辅助 weighted/WinMax detector，使生成端自适应嵌入和检测端统计量形成对应关系。实验结果说明，该方法能够在可解释扰动约束下保持较强检测信号，并为后续研究自适应文本水印提供了可复现实验框架。
+完整 KL 扫描给出了更审慎的结论：CA-KL 能通过 $\varepsilon$ 连续控制实际 KL、\texttt{delta}、PPL 和检测率，但在当前 OPT-2.7B/C4 设置下，尚未在所有相近 PPL 约束下严格优于 Fixed Delta。copy-paste 攻击则验证了 WinMax 的适用性：当水印片段仅占 25\% 时，WinMax 明显优于 global weighted 与 standard KGW；但多窗口搜索必须采用独立负样本阈值校准。
+
+本文的主要贡献包括：第一，复现并系统比较固定 \texttt{delta}、Adaptive Delta、\method{} 和 \fullmethod{}；第二，提出 KL 预算下的动态水印强度控制机制，使每一步 \texttt{delta} 由分布扰动约束决定；第三，实现 candidate-aware greenlist、confidence gate 与模型辅助 weighted/WinMax detector，并以五折校准和局部混入攻击检验检测结论。局限性包括：weighted/WinMax 检测需要访问原基础模型，计算成本高于 standard KGW；$\varepsilon$ 与 gate 参数可能需要跨模型重新调参；当前只在 OPT 与 C4 上验证；本文尚未系统评估释义改写等语义攻击。
+
+\section{实验分工}
+
+\noindent\textbf{施煌：}负责 KGW 原论文阅读、官方仓库复现与实验设置整理，完成 C4/realnewslike prompt 构造、原论文口径的 Fixed Delta 基线核验，以及报告中方法背景、复现步骤和实验设置部分的撰写与整合。
+
+\noindent\textbf{祖裕柏：}负责自适应生成端实现，包括基于熵的 Adaptive Delta、CA-KL 的逐位置 KL 预算二分求解、candidate-aware greenlist 和 confidence gate；编写并维护批量生成、PPL 评测和控制变量主实验脚本，完成 OPT-1.3B 主实验与 KL 预算扫描。
+
+\noindent\textbf{黄镇邦：}负责检测与结果分析模块，实现 weighted detector、WinMax detector、五折独立阈值校准和 bootstrap 统计；完成 copy-paste 局部混入攻击、实验图表与结果汇总，并参与实验结果、局限性和结论部分的撰写。
 
 
 \clearpage
@@ -464,7 +642,7 @@ KL 预算和 confidence gate 共同决定最终扰动强度。预算越大，可
 \appendix
 \section{核心代码片段}
 
-下面列出 \method{} 中 KL 约束求解的核心逻辑。完整代码位于 \codepath{course_project/processors/cakl_watermark_processor.py}。
+下面列出 \method{} 中 KL 约束求解的核心逻辑。
 
 \begin{lstlisting}[language=Python]
 def _kl_for_delta(self, delta: float, p_green_mass: float) -> float:

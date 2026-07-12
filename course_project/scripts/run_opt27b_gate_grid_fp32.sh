@@ -10,6 +10,7 @@ ROOT_DIR="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 GPU_ID="${GPU_ID:-2}"
 MODEL_DIR="${MODEL_DIR:-$ROOT_DIR/models/opt-2.7b}"
+PPL_MODEL_NAME_OR_PATH="${PPL_MODEL_NAME_OR_PATH:-$MODEL_DIR}"
 PROMPTS_PATH="${PROMPTS_PATH:-$ROOT_DIR/course_project/data/prompts_c4_realnewslike_500.txt}"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/course_project/outputs/gate_grid_opt27b_fp32}"
 LIMIT_PROMPTS="${LIMIT_PROMPTS:-50}"
@@ -34,6 +35,7 @@ echo "[info] Root: $ROOT_DIR"
 echo "[info] Python: $PYTHON_BIN"
 echo "[info] GPU: $GPU_ID"
 echo "[info] Model: $MODEL_DIR"
+echo "[info] PPL scorer: $PPL_MODEL_NAME_OR_PATH"
 echo "[info] Prompts: $PROMPTS_PATH"
 echo "[info] Output dir: $OUTPUT_DIR"
 echo "[info] Limit prompts: $LIMIT_PROMPTS"
@@ -112,7 +114,7 @@ for pair in $GATE_GRID; do
       --input_csv "$results_csv" \
       --output_csv "$ppl_results_csv" \
       --summary_md "$ppl_summary_md" \
-      --model_name_or_path "$MODEL_DIR" \
+      --model_name_or_path "$PPL_MODEL_NAME_OR_PATH" \
       --use_gpu True \
       --load_fp16 "$LOAD_FP16" \
       --batch_size "$PPL_BATCH_SIZE"

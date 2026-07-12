@@ -1,0 +1,76 @@
+﻿method,score_field,metric,estimate,ci_lower,ci_upper,bootstrap_repetitions,confidence_level
+CA-KL,z_score,mean_score,7.567796695851885,7.3943134393397045,7.737702369728639,2000,0.95
+CA-KL,z_score,fixed_threshold_detection_rate,0.955988,0.936,0.974,2000,0.95
+CA-KL,z_score,auc,0.997604727,0.99555575,0.9991960999999999,2000,0.95
+CA-KL,z_score,tpr_at_1pct_fpr,0.977984,0.964,0.99,2000,0.95
+CA-KL,z_score,actual_fpr_at_1pct,0.012043,0.004,0.022,2000,0.95
+CA-KL,z_score,tpr_at_5pct_fpr,0.985995,0.974,0.996,2000,0.95
+CA-KL,z_score,actual_fpr_at_5pct,0.062032000000000004,0.042,0.084,2000,0.95
+CA-KL + Candidate Greenlist,weighted_z_score,mean_score,9.139703893069008,8.973345033110416,9.310742269981558,2000,0.95
+CA-KL + Candidate Greenlist,weighted_z_score,fixed_threshold_detection_rate,0.9658749999999999,0.95,0.98,2000,0.95
+CA-KL + Candidate Greenlist,weighted_z_score,auc,0.998783612,0.9970758,0.999844,2000,0.95
+CA-KL + Candidate Greenlist,weighted_z_score,tpr_at_1pct_fpr,0.989845,0.98,0.998,2000,0.95
+CA-KL + Candidate Greenlist,weighted_z_score,actual_fpr_at_1pct,0.014089,0.006,0.024,2000,0.95
+CA-KL + Candidate Greenlist,weighted_z_score,tpr_at_5pct_fpr,0.991945,0.984,0.998,2000,0.95
+CA-KL + Candidate Greenlist,weighted_z_score,actual_fpr_at_5pct,0.052014,0.034,0.072,2000,0.95
+CA-KL + Candidate Greenlist,winmax_weighted_z_score,mean_score,9.179908387332572,9.010756342511133,9.342826065357372,2000,0.95
+CA-KL + Candidate Greenlist,winmax_weighted_z_score,fixed_threshold_detection_rate,0.9700949999999999,0.954,0.984,2000,0.95
+CA-KL + Candidate Greenlist,winmax_weighted_z_score,auc,0.993842278,0.9885074000000001,0.9980561,2000,0.95
+CA-KL + Candidate Greenlist,winmax_weighted_z_score,tpr_at_1pct_fpr,0.976116,0.962,0.988,2000,0.95
+CA-KL + Candidate Greenlist,winmax_weighted_z_score,actual_fpr_at_1pct,0.009961,0.002,0.02,2000,0.95
+CA-KL + Candidate Greenlist,winmax_weighted_z_score,tpr_at_5pct_fpr,0.984052,0.972,0.994,2000,0.95
+CA-KL + Candidate Greenlist,winmax_weighted_z_score,actual_fpr_at_5pct,0.05242,0.034,0.072,2000,0.95
+CA-KL + Candidate Greenlist,z_score,mean_score,6.812167983136261,6.630217549059084,6.98425464799129,2000,0.95
+CA-KL + Candidate Greenlist,z_score,fixed_threshold_detection_rate,0.9245990000000001,0.9,0.946,2000,0.95
+CA-KL + Candidate Greenlist,z_score,auc,0.997071648,0.99471335,0.99883805,2000,0.95
+CA-KL + Candidate Greenlist,z_score,tpr_at_1pct_fpr,0.978162,0.964,0.99,2000,0.95
+CA-KL + Candidate Greenlist,z_score,actual_fpr_at_1pct,0.012009,0.004,0.022,2000,0.95
+CA-KL + Candidate Greenlist,z_score,tpr_at_5pct_fpr,0.985946,0.974,0.994,2000,0.95
+CA-KL + Candidate Greenlist,z_score,actual_fpr_at_5pct,0.06201,0.042,0.084,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,weighted_z_score,mean_score,9.114243854974536,8.939640150413117,9.27854050848578,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,weighted_z_score,fixed_threshold_detection_rate,0.9759369999999999,0.962,0.988,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,weighted_z_score,auc,0.999225694,0.997724,1.0,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,weighted_z_score,tpr_at_1pct_fpr,0.995931,0.99,1.0,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,weighted_z_score,actual_fpr_at_1pct,0.014085,0.004,0.024,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,weighted_z_score,tpr_at_5pct_fpr,0.995931,0.99,1.0,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,weighted_z_score,actual_fpr_at_5pct,0.051947,0.034,0.072,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,winmax_weighted_z_score,mean_score,9.156648923752902,8.987517944729374,9.311253588125163,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,winmax_weighted_z_score,fixed_threshold_detection_rate,0.977908,0.964,0.99,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,winmax_weighted_z_score,auc,0.996948034,0.9930515000000001,0.999616,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,winmax_weighted_z_score,tpr_at_1pct_fpr,0.981841,0.968,0.992,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,winmax_weighted_z_score,actual_fpr_at_1pct,0.009833,0.002,0.02,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,winmax_weighted_z_score,tpr_at_5pct_fpr,0.991901,0.9839500000000001,0.998,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,winmax_weighted_z_score,actual_fpr_at_5pct,0.051693,0.032,0.072,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,z_score,mean_score,6.388035292652492,6.213972192646445,6.568149167249244,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,z_score,fixed_threshold_detection_rate,0.888273,0.86,0.916,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,z_score,auc,0.995102435,0.9916339000000001,0.99787635,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,z_score,tpr_at_1pct_fpr,0.9602799999999999,0.942,0.976,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,z_score,actual_fpr_at_1pct,0.012006,0.004,0.024,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,z_score,tpr_at_5pct_fpr,0.982134,0.97,0.992,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,z_score,actual_fpr_at_5pct,0.06216,0.042,0.084,2000,0.95
+CA-KL + Weighted Detector,weighted_z_score,mean_score,8.836293344431551,8.687207366173766,8.976102202807178,2000,0.95
+CA-KL + Weighted Detector,weighted_z_score,fixed_threshold_detection_rate,0.9755929999999999,0.9619500000000001,0.988,2000,0.95
+CA-KL + Weighted Detector,weighted_z_score,auc,0.999415448,0.9985474000000001,0.9999560999999999,2000,0.95
+CA-KL + Weighted Detector,weighted_z_score,tpr_at_1pct_fpr,0.993721,0.986,1.0,2000,0.95
+CA-KL + Weighted Detector,weighted_z_score,actual_fpr_at_1pct,0.014026,0.004,0.024,2000,0.95
+CA-KL + Weighted Detector,weighted_z_score,tpr_at_5pct_fpr,0.995891,0.99,1.0,2000,0.95
+CA-KL + Weighted Detector,weighted_z_score,actual_fpr_at_5pct,0.051996,0.034,0.072,2000,0.95
+CA-KL + Weighted Detector,winmax_weighted_z_score,mean_score,8.873974548525135,8.715386608478832,9.016417243258365,2000,0.95
+CA-KL + Weighted Detector,winmax_weighted_z_score,fixed_threshold_detection_rate,0.980083,0.966,0.992,2000,0.95
+CA-KL + Weighted Detector,winmax_weighted_z_score,auc,0.995270606,0.9906195999999999,0.9987562,2000,0.95
+CA-KL + Weighted Detector,winmax_weighted_z_score,tpr_at_1pct_fpr,0.980083,0.966,0.992,2000,0.95
+CA-KL + Weighted Detector,winmax_weighted_z_score,actual_fpr_at_1pct,0.010096,0.002,0.02,2000,0.95
+CA-KL + Weighted Detector,winmax_weighted_z_score,tpr_at_5pct_fpr,0.984067,0.972,0.994,2000,0.95
+CA-KL + Weighted Detector,winmax_weighted_z_score,actual_fpr_at_5pct,0.052268,0.034,0.074,2000,0.95
+CA-KL + Weighted Detector,z_score,mean_score,7.569227445756116,7.392917339586057,7.7325788952422725,2000,0.95
+CA-KL + Weighted Detector,z_score,fixed_threshold_detection_rate,0.956255,0.938,0.974,2000,0.95
+CA-KL + Weighted Detector,z_score,auc,0.997599586,0.99569925,0.9990981,2000,0.95
+CA-KL + Weighted Detector,z_score,tpr_at_1pct_fpr,0.978217,0.964,0.99,2000,0.95
+CA-KL + Weighted Detector,z_score,actual_fpr_at_1pct,0.01206,0.004,0.022,2000,0.95
+CA-KL + Weighted Detector,z_score,tpr_at_5pct_fpr,0.986034,0.974,0.994,2000,0.95
+CA-KL + Weighted Detector,z_score,actual_fpr_at_5pct,0.061975,0.042,0.084,2000,0.95
+CA-KL,,corpus_ppl,5.817167281197968,5.605240478880097,6.032468751755231,2000,0.95
+CA-KL + Candidate Greenlist,,corpus_ppl,6.0592243329253765,5.851562673670643,6.262120317402247,2000,0.95
+CA-KL + Candidate Greenlist + Weighted/WinMax,,corpus_ppl,5.603653269548952,5.389216468348114,5.810003137666057,2000,0.95
+CA-KL + Weighted Detector,,corpus_ppl,5.8197780029866015,5.605129404926444,6.040451096260978,2000,0.95
+No Watermark,,corpus_ppl,4.12528577842741,4.005356606206207,4.255201355271769,2000,0.95

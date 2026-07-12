@@ -42,7 +42,10 @@ class AdaptiveDeltaWatermarkLogitsProcessor(WatermarkLogitsProcessor):
     def _compute_step_biases(self, scores: torch.FloatTensor) -> torch.FloatTensor:
         log_probs = torch.log_softmax(scores, dim=-1)
         probs = log_probs.exp()
-        entropies = -(probs * log_probs).sum(dim=-1)
+        # Generation may mask tokens with -inf logits. Their entropy term is
+        # mathematically zero, but 0 * -inf would otherwise create NaNs.
+        entropy_terms = torch.where(probs > 0, probs * log_probs, torch.zeros_like(probs))
+        entropies = -entropy_terms.sum(dim=-1)
         max_entropy = scores.new_tensor(float(max(self.vocab_size, 2))).log()
         normalized_entropies = (entropies / max_entropy).clamp(0.0, 1.0)
         # The original linear mapping kept most steps too close to delta~1.0 on OPT-2.7B.

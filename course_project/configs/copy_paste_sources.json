@@ -1,0 +1,28 @@
+{
+  "sources": [
+    {
+      "name": "Fixed Delta 2.0",
+      "method": "Fixed Delta 2.0",
+      "results_csv": "course_project/outputs/opt27b_fp32_c4_500_full_results.csv",
+      "use_candidate_greenlist": false,
+      "use_confidence_gate": false
+    },
+    {
+      "name": "CA-KL",
+      "method": "CA-KL",
+      "results_csv": "course_project/outputs/opt27b_fp32_c4_500_gate010_095_results.csv",
+      "use_candidate_greenlist": false,
+      "use_confidence_gate": false
+    },
+    {
+      "name": "CA-KL-CG",
+      "method": "CA-KL + Candidate Greenlist + Weighted/WinMax",
+      "results_csv": "course_project/outputs/opt27b_fp32_c4_500_gate010_095_results.csv",
+      "candidate_top_p": 0.95,
+      "use_candidate_greenlist": true,
+      "use_confidence_gate": true,
+      "entropy_threshold": 0.1,
+      "top1_threshold": 0.95
+    }
+  ]
+}

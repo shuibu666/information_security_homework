@@ -1,0 +1,122 @@
+{
+  "experiment": "OPT-2.7B C4/realnewslike 500-prompt Pareto comparison",
+  "prompt_file": "course_project/data/prompts_c4_realnewslike_500.txt",
+  "required_epsilon_values": [
+    0.2,
+    0.3,
+    0.35,
+    0.4,
+    0.5
+  ],
+  "sources": [
+    {
+      "source_id": "full",
+      "name": "Fixed Delta 1.0",
+      "family": "Fixed Delta",
+      "parameter": "delta=1.0",
+      "method": "Fixed Delta 1.0",
+      "results_csv": "course_project/outputs/opt27b_fp32_c4_500_full_results.csv",
+      "ppl_csv": "course_project/outputs/opt27b_fp32_c4_500_full_ppl_results.csv"
+    },
+    {
+      "source_id": "fixed17",
+      "name": "Fixed Delta 1.7",
+      "family": "Fixed Delta",
+      "parameter": "delta=1.7",
+      "method": "Fixed Delta 1.7",
+      "results_csv": "course_project/outputs/opt27b_fp32_c4_500_fixed17_results.csv",
+      "ppl_csv": "course_project/outputs/opt27b_fp32_c4_500_fixed17_ppl_results.csv"
+    },
+    {
+      "source_id": "full",
+      "name": "Fixed Delta 1.864",
+      "family": "Fixed Delta",
+      "parameter": "delta=1.864",
+      "method": "Fixed Delta 1.864",
+      "results_csv": "course_project/outputs/opt27b_fp32_c4_500_full_results.csv",
+      "ppl_csv": "course_project/outputs/opt27b_fp32_c4_500_full_ppl_results.csv"
+    },
+    {
+      "source_id": "full",
+      "name": "Fixed Delta 2.0",
+      "family": "Fixed Delta",
+      "parameter": "delta=2.0",
+      "method": "Fixed Delta 2.0",
+      "results_csv": "course_project/outputs/opt27b_fp32_c4_500_full_results.csv",
+      "ppl_csv": "course_project/outputs/opt27b_fp32_c4_500_full_ppl_results.csv"
+    },
+    {
+      "source_id": "full",
+      "name": "Fixed Delta 3.0",
+      "family": "Fixed Delta",
+      "parameter": "delta=3.0",
+      "method": "Fixed Delta 3.0",
+      "results_csv": "course_project/outputs/opt27b_fp32_c4_500_full_results.csv",
+      "ppl_csv": "course_project/outputs/opt27b_fp32_c4_500_full_ppl_results.csv"
+    },
+    {
+      "source_id": "gate010095",
+      "name": "CA-KL-CG epsilon 0.50",
+      "family": "CA-KL-CG",
+      "parameter": "epsilon=0.50",
+      "epsilon": 0.5,
+      "method": "CA-KL + Candidate Greenlist + Weighted/WinMax",
+      "results_csv": "course_project/outputs/opt27b_fp32_c4_500_gate010_095_results.csv",
+      "ppl_csv": "course_project/outputs/opt27b_fp32_c4_500_gate010_095_ppl_results.csv"
+    },
+    {
+      "source_id": "cakl_eps020",
+      "name": "CA-KL epsilon 0.20",
+      "family": "CA-KL",
+      "parameter": "epsilon=0.20",
+      "epsilon": 0.2,
+      "method": "CA-KL",
+      "results_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps020_results.csv",
+      "ppl_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps020_ppl_results.csv"
+    },
+    {
+      "source_id": "cakl_eps030",
+      "name": "CA-KL epsilon 0.30",
+      "family": "CA-KL",
+      "parameter": "epsilon=0.30",
+      "epsilon": 0.3,
+      "method": "CA-KL",
+      "results_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps030_results.csv",
+      "ppl_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps030_ppl_results.csv"
+    },
+    {
+      "source_id": "cakl_eps035",
+      "name": "CA-KL epsilon 0.35",
+      "family": "CA-KL",
+      "parameter": "epsilon=0.35",
+      "epsilon": 0.35,
+      "method": "CA-KL",
+      "results_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps035_results.csv",
+      "ppl_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps035_ppl_results.csv"
+    },
+    {
+      "source_id": "cakl_eps040",
+      "name": "CA-KL epsilon 0.40",
+      "family": "CA-KL",
+      "parameter": "epsilon=0.40",
+      "epsilon": 0.4,
+      "method": "CA-KL",
+      "results_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps040_results.csv",
+      "ppl_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps040_ppl_results.csv"
+    },
+    {
+      "source_id": "cakl_eps050",
+      "name": "CA-KL epsilon 0.50",
+      "family": "CA-KL",
+      "parameter": "epsilon=0.50",
+      "epsilon": 0.5,
+      "method": "CA-KL",
+      "results_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps050_results.csv",
+      "ppl_csv": "/home/zyb/inform/course_project/outputs/additional/pareto/raw/cakl_opt27b_c4_500_eps050_ppl_results.csv"
+    }
+  ],
+  "manifest_path": "/home/zyb/inform/course_project/outputs/additional/pareto/pareto_sources_complete.json",
+  "output_dir": "/home/zyb/inform/course_project/outputs/additional/pareto",
+  "warnings": [],
+  "metric_note": "AUC/TPR columns in pareto_summary.csv are in-sample diagnostics only. Use calibrate_detection.py outputs for reportable independent-calibration metrics."
+}

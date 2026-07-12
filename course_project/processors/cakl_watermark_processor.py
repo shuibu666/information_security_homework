@@ -16,6 +16,25 @@ def _mean_or_empty(values: Iterable[float]) -> float | str:
     return mean(values) if values else ""
 
 
+def _percentile_or_empty(values: Iterable[float], quantile: float) -> float | str:
+    values = sorted(values)
+    if not values:
+        return ""
+    location = (len(values) - 1) * quantile
+    low, high = int(location), min(int(location) + 1, len(values) - 1)
+    if low == high:
+        return values[low]
+    return values[low] * (high - location) + values[high] * (location - low)
+
+
+def _population_std_or_empty(values: Iterable[float]) -> float | str:
+    values = list(values)
+    if not values:
+        return ""
+    average = mean(values)
+    return sqrt(sum((value - average) ** 2 for value in values) / len(values))
+
+
 class CAKLWatermarkLogitsProcessor(WatermarkLogitsProcessor):
     """KL-constrained adaptive watermark with optional candidate-aware greenlists."""
 
@@ -57,7 +76,8 @@ class CAKLWatermarkLogitsProcessor(WatermarkLogitsProcessor):
     def _distribution_stats(self, scores: torch.FloatTensor) -> tuple[torch.Tensor, float, float]:
         log_probs = torch.log_softmax(scores, dim=-1)
         probs = log_probs.exp()
-        entropy = float((-(probs * log_probs).sum()).detach().cpu())
+        entropy_terms = torch.where(probs > 0, probs * log_probs, torch.zeros_like(probs))
+        entropy = float((-entropy_terms.sum()).detach().cpu())
         max_entropy = log(float(max(self.vocab_size, 2)))
         normalized_entropy = min(max(entropy / max_entropy, 0.0), 1.0)
         top1_prob = float(probs.max().detach().cpu())
@@ -151,9 +171,14 @@ class CAKLWatermarkLogitsProcessor(WatermarkLogitsProcessor):
         return greenlist_ids, stats
 
     def get_generation_summary(self) -> dict[str, float | str]:
+        deltas = [row["delta"] for row in self.step_history]
         return {
             "avg_kl": _mean_or_empty(row["kl"] for row in self.step_history),
-            "avg_delta": _mean_or_empty(row["delta"] for row in self.step_history),
+            "avg_delta": _mean_or_empty(deltas),
+            "delta_std": _population_std_or_empty(deltas),
+            "delta_p25": _percentile_or_empty(deltas, 0.25),
+            "delta_p50": _percentile_or_empty(deltas, 0.50),
+            "delta_p75": _percentile_or_empty(deltas, 0.75),
             "avg_entropy": _mean_or_empty(row["entropy"] for row in self.step_history),
             "avg_p_green_mass": _mean_or_empty(row["p_green_mass"] for row in self.step_history),
             "gate_pass_rate": _mean_or_empty(row["gate_passed"] for row in self.step_history),
@@ -214,7 +239,8 @@ class CAKLModelAssistedDetector(WatermarkBase):
     def _distribution_stats(self, scores: torch.FloatTensor) -> tuple[torch.Tensor, float, float]:
         log_probs = torch.log_softmax(scores, dim=-1)
         probs = log_probs.exp()
-        entropy = float((-(probs * log_probs).sum()).detach().cpu())
+        entropy_terms = torch.where(probs > 0, probs * log_probs, torch.zeros_like(probs))
+        entropy = float((-entropy_terms.sum()).detach().cpu())
         max_entropy = log(float(max(self.vocab_size, 2)))
         normalized_entropy = min(max(entropy / max_entropy, 0.0), 1.0)
         top1_prob = float(probs.max().detach().cpu())

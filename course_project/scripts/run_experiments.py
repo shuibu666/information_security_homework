@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import re
 from pathlib import Path
 import sys
@@ -270,7 +271,7 @@ def format_prediction(prediction: bool) -> str:
     return "Watermarked" if prediction else "Human/Unwatermarked"
 
 
-def build_row(prompt_id, prompt, method, delta, delta_min, delta_max, generated_text, detection_result, text_metrics, extra_metrics=None):
+def build_row(prompt_id, prompt, method, delta, delta_min, delta_max, generated_text, token_ids, detection_result, text_metrics, extra_metrics=None):
     extra_metrics = extra_metrics or {}
     confidence = detection_result.get("confidence")
     row = {
@@ -281,6 +282,7 @@ def build_row(prompt_id, prompt, method, delta, delta_min, delta_max, generated_
         "delta_max": delta_max,
         "prompt": prompt,
         "generated_text": generated_text,
+        "token_ids": json.dumps(token_ids.detach().cpu().tolist()),
         "tokens_counted": detection_result.get("num_tokens_scored"),
         "num_green_tokens": detection_result.get("num_green_tokens"),
         "green_fraction": detection_result.get("green_fraction"),
@@ -305,6 +307,10 @@ def build_row(prompt_id, prompt, method, delta, delta_min, delta_max, generated_
         "weighted_confidence",
         "avg_kl",
         "avg_delta",
+        "delta_std",
+        "delta_p25",
+        "delta_p50",
+        "delta_p75",
         "avg_entropy",
         "avg_p_green_mass",
         "gate_pass_rate",
@@ -327,6 +333,7 @@ def write_results(rows, output_csv: str):
         "delta_max",
         "prompt",
         "generated_text",
+        "token_ids",
         "tokens_counted",
         "num_green_tokens",
         "green_fraction",
@@ -348,6 +355,10 @@ def write_results(rows, output_csv: str):
         "weighted_confidence",
         "avg_kl",
         "avg_delta",
+        "delta_std",
+        "delta_p25",
+        "delta_p50",
+        "delta_p75",
         "avg_entropy",
         "avg_p_green_mass",
         "gate_pass_rate",
@@ -415,6 +426,7 @@ def main():
                     delta_min="",
                     delta_max="",
                     generated_text=plain_text,
+                    token_ids=plain_token_ids,
                     detection_result=plain_detection,
                     text_metrics=plain_metrics,
                     extra_metrics=plain_weighted_detection,
@@ -453,6 +465,7 @@ def main():
                         delta_min="",
                         delta_max="",
                         generated_text=generated_text,
+                        token_ids=token_ids,
                         detection_result=detection_result,
                         text_metrics=text_metrics,
                         extra_metrics={
@@ -501,6 +514,7 @@ def main():
                     delta_min=args.adaptive_delta_min,
                     delta_max=args.adaptive_delta_max,
                     generated_text=adaptive_text,
+                    token_ids=adaptive_token_ids,
                     detection_result=adaptive_detection,
                     text_metrics=adaptive_metrics,
                     extra_metrics=adaptive_extra,
@@ -546,6 +560,7 @@ def main():
                     delta_min="",
                     delta_max=args.cakl_delta_max,
                     generated_text=cakl_text,
+                    token_ids=cakl_token_ids,
                     detection_result=cakl_detection,
                     text_metrics=cakl_metrics,
                     extra_metrics=cakl_summary,
@@ -562,6 +577,7 @@ def main():
                     delta_min="",
                     delta_max=args.cakl_delta_max,
                     generated_text=cakl_text,
+                    token_ids=cakl_token_ids,
                     detection_result=cakl_detection,
                     text_metrics=cakl_metrics,
                     extra_metrics=cakl_weighted_summary,
@@ -607,6 +623,7 @@ def main():
                     delta_min="",
                     delta_max=args.cakl_delta_max,
                     generated_text=candidate_text,
+                    token_ids=candidate_token_ids,
                     detection_result=candidate_detection,
                     text_metrics=candidate_metrics,
                     extra_metrics=candidate_summary,
@@ -652,6 +669,7 @@ def main():
                     delta_min="",
                     delta_max=args.cakl_delta_max,
                     generated_text=full_text,
+                    token_ids=full_token_ids,
                     detection_result=full_detection,
                     text_metrics=full_metrics,
                     extra_metrics=full_summary,
