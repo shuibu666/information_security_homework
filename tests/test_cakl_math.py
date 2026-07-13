@@ -57,6 +57,19 @@ def test_standard_detector_cache_preserves_score():
     assert cached == uncached
 
 
+def test_fixed_delta_candidate_gate_control_applies_fixed_delta_when_open():
+    from course_project.processors.cakl_watermark_processor import FixedDeltaCandidateGateLogitsProcessor
+
+    processor = FixedDeltaCandidateGateLogitsProcessor(
+        vocab=list(range(32)), gamma=.25, delta=1.7, fixed_delta=1.7, candidate_top_p=.95,
+        use_candidate_greenlist=True, use_confidence_gate=True, entropy_threshold=0.0, top1_threshold=1.0,
+    )
+    processor.rng = torch.Generator(device="cpu")
+    _, stats = processor._step_greenlist_and_stats(torch.tensor([1, 2, 3]), torch.randn(32))
+    assert stats["gate_passed"] == 1.0
+    assert stats["delta"] == 1.7
+
+
 def test_generation_and_detector_step_stats_match():
     from course_project.processors.cakl_watermark_processor import CAKLModelAssistedDetector
 

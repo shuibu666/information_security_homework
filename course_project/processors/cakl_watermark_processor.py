@@ -216,6 +216,26 @@ class CAKLWatermarkLogitsProcessor(WatermarkLogitsProcessor):
         return scores + green_tokens_mask.to(scores.dtype) * delta_tensor
 
 
+class FixedDeltaCandidateGateLogitsProcessor(CAKLWatermarkLogitsProcessor):
+    """Fixed-delta candidate+gate control for the Phase 4D matched comparison."""
+
+    def __init__(self, *args, fixed_delta: float, **kwargs):
+        if fixed_delta < 0.0:
+            raise ValueError("fixed_delta must be non-negative")
+        super().__init__(*args, kl_epsilon=0.0, **kwargs)
+        self.fixed_delta = fixed_delta
+
+    def _step_greenlist_and_stats(self, input_ids: torch.LongTensor, scores: torch.FloatTensor):
+        greenlist_ids, stats = super()._step_greenlist_and_stats(input_ids, scores)
+        if stats["gate_passed"]:
+            stats["delta"] = self.fixed_delta
+            kl = self._kl_for_delta(self.fixed_delta, stats["p_green_mass"])
+            stats["kl"] = kl
+            stats["preprocessor_kl"] = kl
+            stats["actual_sampling_kl"] = kl
+        return greenlist_ids, stats
+
+
 class CAKLModelAssistedDetector(WatermarkBase):
     """Detector that recomputes prefix distributions for weighted/windowed CA-KL-CG scores."""
 

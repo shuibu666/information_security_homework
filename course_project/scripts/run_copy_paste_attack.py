@@ -125,7 +125,11 @@ def tpr_at_fpr(pos: list[float], neg: list[float], fpr: float) -> float | None:
 
 
 def build_detectors(source: dict[str, object], model, tokenizer, device: torch.device, window_sizes: str):
-    vocab = list(tokenizer.get_vocab().values())
+    # The detector must use the model's full output vocabulary.  For OPT-1.3B
+    # ``len(tokenizer)`` is smaller than the LM head vocabulary, so deriving
+    # ids from the tokenizer would make greenlist construction inconsistent
+    # with generation and can index outside the tokenizer-derived range.
+    vocab = list(range(model.get_output_embeddings().weight.shape[0]))
     common = {
         "vocab": vocab,
         "gamma": float(source.get("gamma", 0.25)),

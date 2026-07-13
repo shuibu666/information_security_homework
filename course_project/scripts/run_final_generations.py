@@ -16,7 +16,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from course_project.final_protocol import config_hash, generation_id, read_jsonl, stable_sample_seed, tokenizer_vocab_fingerprint, validate_generation_records, write_json_atomic, write_jsonl_atomic
-from course_project.processors.cakl_watermark_processor import CAKLWatermarkLogitsProcessor
+from course_project.processors.cakl_watermark_processor import CAKLWatermarkLogitsProcessor, FixedDeltaCandidateGateLogitsProcessor
 from watermark_processor import WatermarkLogitsProcessor
 
 
@@ -25,8 +25,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest_jsonl", required=True)
     parser.add_argument("--output_jsonl", required=True)
     parser.add_argument("--split", choices=["validation", "test"], required=True)
-    parser.add_argument("--generator_id", choices=["no_watermark", "kgw_fixed", "cakl_base", "cakl_candidate", "cakl_gate", "cakl_cg"], required=True)
+    parser.add_argument("--generator_id", choices=["no_watermark", "kgw_fixed", "cakl_base", "cakl_candidate", "cakl_gate", "cakl_cg", "kgw_cg"], required=True)
     parser.add_argument("--parameter_id", required=True)
+    parser.add_argument("--protocol_version", default="final_v2")
     parser.add_argument("--model_name_or_path", default="facebook/opt-1.3b")
     parser.add_argument("--model_revision", default="main")
     parser.add_argument("--dtype", choices=["fp16", "bf16", "fp32"], default="fp16")
@@ -71,8 +72,8 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("final-v1 requires min_new_tokens=max_new_tokens=200")
     if not (args.temperature == 1.0 and args.top_k == 0 and args.top_p == 1.0):
         raise ValueError("final-v1 main protocol requires temperature=1, top_k=0, top_p=1")
-    if args.generator_id == "kgw_fixed" and args.fixed_delta is None:
-        raise ValueError("kgw_fixed requires --fixed_delta")
+    if args.generator_id in {"kgw_fixed", "kgw_cg"} and args.fixed_delta is None:
+        raise ValueError("fixed-delta generators require --fixed_delta")
     if args.generator_id.startswith("cakl_") and args.kl_epsilon is None:
         raise ValueError("CA-KL generators require --kl_epsilon")
 
@@ -82,6 +83,12 @@ def build_processor(args: argparse.Namespace, vocab_ids: list[int]):
         return None
     if args.generator_id == "kgw_fixed":
         return WatermarkLogitsProcessor(vocab=vocab_ids, gamma=args.gamma, delta=args.fixed_delta, seeding_scheme="simple_1")
+    if args.generator_id == "kgw_cg":
+        return FixedDeltaCandidateGateLogitsProcessor(
+            vocab=vocab_ids, gamma=args.gamma, delta=args.fixed_delta, seeding_scheme="simple_1", fixed_delta=args.fixed_delta,
+            candidate_top_p=args.candidate_top_p, use_candidate_greenlist=True, use_confidence_gate=True,
+            entropy_threshold=args.entropy_threshold, top1_threshold=args.top1_threshold,
+        )
     use_candidate, use_gate = generator_flags(args.generator_id)
     return CAKLWatermarkLogitsProcessor(
         vocab=vocab_ids, gamma=args.gamma, delta=args.delta_max, seeding_scheme="simple_1",
@@ -92,7 +99,7 @@ def build_processor(args: argparse.Namespace, vocab_ids: list[int]):
 
 
 def config_for_args(args: argparse.Namespace, manifest_path: Path) -> dict[str, object]:
-    return {key: value for key, value in vars(args).items() if key not in {"output_jsonl", "resume"}} | {"manifest_path": str(manifest_path), "protocol_version": "final_v1"}
+    return {key: value for key, value in vars(args).items() if key not in {"output_jsonl", "resume"}} | {"manifest_path": str(manifest_path)}
 
 
 def main() -> None:
@@ -121,7 +128,9 @@ def main() -> None:
     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, revision=args.model_revision, torch_dtype=dtype_for_args(args)).to(args.device).eval()
     tokenizer_fingerprint = tokenizer_vocab_fingerprint(tokenizer)
     max_context = getattr(model.config, "max_position_embeddings", None)
-    vocab_ids = list(range(len(tokenizer)))
+    # OPT's output embedding can include extra IDs beyond len(tokenizer).
+    # Greenlists must cover the exact score vector received by the processor.
+    vocab_ids = list(range(model.get_output_embeddings().weight.shape[0]))
     output: list[dict[str, object]] = []
     for record in records:
         prompt_ids = [int(value) for value in record["prompt_token_ids"]]

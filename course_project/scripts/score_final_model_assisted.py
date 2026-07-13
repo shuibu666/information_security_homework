@@ -53,7 +53,7 @@ def main() -> None:
     }
     detector_id, detector_hash = detector_config_id(config), config_hash(config)
     detector = CAKLModelAssistedDetector(
-        vocab=list(range(len(tokenizer))), gamma=args.gamma, delta=3.0, seeding_scheme="simple_1",
+        vocab=list(range(model.get_output_embeddings().weight.shape[0])), gamma=args.gamma, delta=3.0, seeding_scheme="simple_1",
         model=model, tokenizer=tokenizer, device=torch.device(args.device), candidate_top_p=args.candidate_top_p,
         use_candidate_greenlist=args.greenlist_mode == "candidate", use_confidence_gate=args.gate,
         entropy_threshold=args.entropy_threshold, top1_threshold=args.top1_threshold, window_sizes=args.window_sizes,

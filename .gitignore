@@ -136,3 +136,9 @@ deliverables/report_and_figures/report_source.aux
 deliverables/report_and_figures/report_source.out
 deliverables/report_and_figures/report_source.toc
 deliverables/report_and_figures/report_source.synctex*
+deliverables/final_v3_report/*.aux
+deliverables/final_v3_report/*.bbl
+deliverables/final_v3_report/*.blg
+deliverables/final_v3_report/*.out
+deliverables/final_v3_report/*.toc
+deliverables/final_v3_report/__latexindent_temp_*.tex

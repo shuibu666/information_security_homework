@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>大语言模型文本水印实验结果</title>
+    <meta
+      name="description"
+      content="KGW 与 CA-KL 文本水印实验结果前端展示。"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">信息安全技术课程项目</p>
+        <h1>大语言模型文本水印实验结果</h1>
+      </div>
+      <nav class="quick-links" aria-label="结果导航">
+        <a href="#tradeoff">折中曲线</a>
+        <a href="#detectors">匹配检测</a>
+        <a href="#table">主结果表</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="summary-band" aria-labelledby="summary-title">
+        <div class="summary-copy">
+          <h2 id="summary-title">CA-KL 将固定偏置改为逐 token KL 预算</h2>
+          <p>
+            本页面汇总 test-500 × 3 seeds 的核心结果。KGW 作为固定
+            delta 基线，CA-KL 通过 epsilon 控制每个生成位置的分布扰动。
+            结果重点不是宣称单点全面支配，而是展示检测率、语义一致性与
+            PPL 之间的可控折中。
+          </p>
+        </div>
+        <div class="metric-grid" aria-label="核心指标">
+          <article class="metric-card">
+            <span>CA-KL 选定点</span>
+            <strong>94.80%</strong>
+            <small>TPR@1%FPR, ε=0.10</small>
+          </article>
+          <article class="metric-card">
+            <span>语义一致性</span>
+            <strong>0.6875</strong>
+            <small>SimCSE, ε=0.10</small>
+          </article>
+          <article class="metric-card">
+            <span>匹配检测提升</span>
+            <strong>+11.40</strong>
+            <small>CA-KL-CG matched vs standard</small>
+          </article>
+          <article class="metric-card">
+            <span>Human FPR</span>
+            <strong>0.6%</strong>
+            <small>test human completions</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-section" id="tradeoff" aria-labelledby="tradeoff-title">
+        <div class="section-heading">
+          <p class="eyebrow">Detectability and quality</p>
+          <h2 id="tradeoff-title">检测率-质量折中</h2>
+          <p>
+            散点是冻结测试集上的实际工作点，平滑线用于呈现同一方法族内部
+            随水印强度变化的趋势。SimCSE 越高越好，PPL 越低越好。
+          </p>
+        </div>
+
+        <div class="chart-grid">
+          <article class="chart-panel">
+            <div class="panel-title">
+              <h3>SimCSE 与 TPR</h3>
+              <p>高检测区局部放大</p>
+            </div>
+            <canvas id="simChart" width="720" height="420" aria-label="SimCSE 与 TPR 折中曲线"></canvas>
+          </article>
+          <article class="chart-panel">
+            <div class="panel-title">
+              <h3>Corpus PPL 与 TPR</h3>
+              <p>完整强度扫描</p>
+            </div>
+            <canvas id="pplChart" width="720" height="420" aria-label="Corpus PPL 与 TPR 折中曲线"></canvas>
+          </article>
+        </div>
+
+        <div class="insight-row">
+          <p>
+            在 99.33% TPR 附近，CA-KL ε=0.30 的 SimCSE 为 0.6692，
+            高于 KGW δ=2.0 的 0.6636；PPL 方面二者仍有交错，说明
+            CA-KL 的主要价值是更可解释的强度分配，而不是无条件降低 PPL。
+          </p>
+        </div>
+      </section>
+
+      <section class="content-section muted" id="detectors" aria-labelledby="detector-title">
+        <div class="section-heading">
+          <p class="eyebrow">Detector pairing</p>
+          <h2 id="detector-title">完整方法与匹配检测</h2>
+          <p>
+            Candidate 与 gate 改变了嵌入支持集和有效位置，因此检测端需要重建相同配置。
+          </p>
+        </div>
+        <div class="detector-layout">
+          <article class="comparison-panel">
+            <h3>CA-KL-CG</h3>
+            <div class="bar-row">
+              <span>Standard KGW</span>
+              <div class="bar"><i style="width: 86.4%"></i></div>
+              <b>86.40%</b>
+            </div>
+            <div class="bar-row accent">
+              <span>Matched weighted-global</span>
+              <div class="bar"><i style="width: 97.8%"></i></div>
+              <b>97.80%</b>
+            </div>
+            <p>匹配检测比 standard detector 高 11.40 个百分点。</p>
+          </article>
+          <article class="comparison-panel">
+            <h3>Matched KGW-CG control</h3>
+            <div class="bar-row">
+              <span>Standard KGW</span>
+              <div class="bar"><i style="width: 97.73%"></i></div>
+              <b>97.73%</b>
+            </div>
+            <div class="bar-row accent-blue">
+              <span>Matched weighted-global</span>
+              <div class="bar"><i style="width: 98.8%"></i></div>
+              <b>98.80%</b>
+            </div>
+            <p>该对照用于区分动态 KL、candidate/gate 与 detector 本身的贡献。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-section" id="table" aria-labelledby="table-title">
+        <div class="section-heading">
+          <p class="eyebrow">Frozen test points</p>
+          <h2 id="table-title">主工作点数据</h2>
+          <p>所有数值来自相同 test prompts，TPR 阈值由 validation human completions 校准。</p>
+        </div>
+        <div class="table-tools" role="group" aria-label="筛选方法">
+          <button class="filter-button active" data-filter="all" type="button">全部</button>
+          <button class="filter-button" data-filter="KGW" type="button">KGW</button>
+          <button class="filter-button" data-filter="CA-KL" type="button">CA-KL</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>方法</th>
+                <th>参数</th>
+                <th>TPR@1%FPR</th>
+                <th>SimCSE</th>
+                <th>Corpus PPL</th>
+              </tr>
+            </thead>
+            <tbody id="resultRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Final-v3 results dashboard</span>
+      <a href="../final_v3_report/final_v3_report.pdf">打开实验报告 PDF</a>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
