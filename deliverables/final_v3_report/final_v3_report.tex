@@ -64,11 +64,11 @@
 \end{titlepage}
 
 \begin{abstract}
-    本文面向大语言模型生成文本的来源识别问题，复现 Kirchenbauer 等人提出的 KGW 统计水印，并在统一、可审计的实验协议下研究逐位置 KL 约束水印。KGW 以固定偏置 $\delta$ 提高 green token 的采样概率，检测简单但无法直接约束不同上下文位置的分布扰动。为此，本文采用 \cakl{}：对每个生成位置求解满足 $D_{\mathrm{KL}}(Q_t\Vert P_t)\leq\varepsilon$ 的最大偏置 $\delta_t$，使水印强度由可解释的逐 token KL 预算控制；在完整方法 \caklcg{} 中进一步加入 candidate-aware greenlist、confidence gate 与配置严格匹配的 weighted detector。
+    大语言模型生成文本的可追溯性是内容安全与信息治理中的重要问题。统计水印方法通过在生成阶段引入可检测的概率偏置，使检测端能够在不知道原始采样轨迹的情况下判断文本来源。本文以 Kirchenbauer 等人提出的 KGW 方法为基线，完成官方链路复现，并进一步研究逐位置 KL 约束的水印生成方式。该方法在每个生成位置根据原始词分布自适应求解水印偏置，使分布扰动受到 $D_{\mathrm{KL}}(Q_t\Vert P_t)\leq\varepsilon$ 的显式约束；在此基础上，本文结合候选集合约束、置信门控和匹配检测器，构建生成端与检测端一致的文本水印流程。
 
-    实验从 C4/realnewslike 构造互不重叠的 validation/test 各 500 条记录，在 OPT-1.3B、200 个生成 token、$\gamma=0.25$、temperature 1.0、top-k 0、top-p 1.0 的统一配置下完成参数选择与 test-500 $\times$ 3 seeds 独立评测。检测阈值由 validation human completions 校准；test human completions 的实际 FPR 为 0.6\%。不确定性采用 2,000 次 prompt-cluster bootstrap 估计。
+    实验基于 C4/realnewslike 数据构造互不重叠的参数选择集和独立测试集，在 OPT-1.3B 模型上生成定长 continuation，并以低误报率阈值校准、语义相似度、困惑度和 bootstrap 置信区间综合评价检测能力与文本质量。结果表明，逐位置 KL 预算能够形成连续可调的检测--质量折中：当 $\varepsilon$ 从 0.02 增至 0.50 时，\tpr{} 由 29.67\% 提升至 99.53\%，SimCSE 由 0.7218 降至 0.6566，corpus PPL 由 22.97 增至 34.14。在 $\varepsilon=0.10$ 的代表性工作点上，该方法达到 94.80\% \tpr{}、0.6875 SimCSE 和 25.25 corpus PPL，与 KGW 固定偏置方法形成接近但不完全支配的性能关系。
 
-    最终结果显示，\cakl{} 的 $\varepsilon$ 从 0.02 增至 0.50 时，\tpr{} 从 29.67\% 增至 99.53\%，同时 SimCSE 从 0.7218 降至 0.6566、corpus PPL 从 22.97 增至 34.14，呈现清晰的检测--质量折中。在预注册的 $\varepsilon=0.10$ 工作点上，\cakl{} 达到 94.80\% \tpr{}、0.6875 SimCSE 和 25.25 corpus PPL；KGW $\delta=1.0$ 为 92.27\%、0.6901 和 23.97。两条曲线在局部接近，但现有区间不足以支持“\cakl{} 严格改善 KGW Pareto 前沿”的强结论。对于 validation 选定的 \caklcg{}，standard KGW detector 的 TPR 为 86.40\%，matched weighted-global detector 则达到 97.80\%，表明检测配置与 candidate/gate 生成逻辑的一致性直接影响统计功效。总体而言，\cakl{} 提供了连续的检测--质量工作曲线，匹配检测显著恢复了完整方法的水印证据，但 clean 条件下尚不能宣称全面优于 KGW 固定偏置包络。
+    进一步实验显示，候选集合约束与置信门控会改变有效水印位置和统计权重，因此检测器必须与生成机制保持一致。对于完整方法，标准 KGW 检测器得到 86.40\% TPR，而匹配的 weighted-global 检测器达到 97.80\% TPR，说明检测配置对统计功效具有关键影响。总体而言，本文验证了 KGW 文本水印的基本有效性，给出了逐位置 KL 预算下水印强度、检测率与文本质量之间的量化关系，并表明匹配检测是改进型水印系统中不可忽略的组成部分。
 
     \noindent\textbf{关键词：}大语言模型；文本水印；KGW；KL 散度；匹配检测；低误报率校准
 \end{abstract}
@@ -90,7 +90,7 @@
 \begin{enumerate}
     \item 完成 KGW 官方生成--检测链路复现，并保留其 seeded greenlist 与标准 z-score 作为共同基线；
     \item 建立结构化数据、全词表 greenlist、精确 PPL/SimCSE 计分、detector pairing 与 held-out calibration 组成的可复现实验流程；
-    \item 在 test-500 $\times$ 3 seeds 上比较 7 个 KGW fixed-delta 点和 7 个 \cakl{} epsilon 点，并报告 held-out FPR、主质量指标和 prompt-cluster bootstrap 区间；
+    \item 在独立测试集和三组随机种子上比较 7 个 KGW 固定偏置工作点与 7 个 \cakl{} 预算工作点，并报告独立误报率、主要质量指标和 prompt-cluster bootstrap 区间；
     \item 对 validation 选定的 \caklcg{} 与 matched KGW-CG 对照分别使用 standard、weighted-global 和 weighted-winmax 检测，分析生成逻辑与检测器匹配的作用。
 \end{enumerate}
 
@@ -165,7 +165,7 @@ KGW 水印通过固定 logit 偏置提高 green token 的采样概率，其检�
     z_w=\frac{\sum_t w_t(\mathbf 1[x_t\in G_t]-p_{G,t})}
     {\sqrt{\sum_t w_t^2p_{G,t}(1-p_{G,t})}},
 \]
-其中 $w_t$ 由模型分布和可嵌入性决定。Weighted-global 在全文范围内聚合证据；Weighted-WinMax 在多个滑动窗口上计算 $z_w$ 并取最大值。由于窗口搜索会引入多重比较效应，Weighted-WinMax 的阈值在 validation 集上独立校准，不与 standard 或 global 检测器共享阈值。本文的评测范围为 clean generation，WinMax 用于比较不同检测证据聚合方式的效果。
+其中 $w_t$ 由模型分布和可嵌入性决定。Weighted-global 在全文范围内聚合证据；Weighted-WinMax 在多个滑动窗口上计算 $z_w$ 并取最大值。由于窗口搜索会引入多重比较效应，Weighted-WinMax 的阈值在 validation 集上独立校准，不与 standard 或 global 检测器共享阈值。本文的评测范围为未攻击生成场景，WinMax 用于比较不同检测证据聚合方式的效果。
 
 \section{实验设计}
 
@@ -205,8 +205,8 @@ KGW 水印通过固定 logit 偏置提高 green token 的采样概率，其检�
 
 \begin{enumerate}
     \item 在小规模样本上验证 KGW、\cakl{} 与 matched detector 的实现一致性，包括固定生成长度、$\varepsilon=0$ 与 No-Watermark 等价、逐步 KL 约束、PPL continuation 边界以及 SimCSE 一一配对；
-    \item 在 validation 集上扫描 KGW fixed-delta 与 \cakl{} epsilon 网格，并完成 candidate-only、gate-only 和 candidate+gate 消融，根据预设规则选择完整方法参数；
-    \item 固定模型、采样参数、方法工作点、检测器配置和随机种子，在 500 条 test prompts 上以三个 base seeds 生成全部比较文本；
+    \item 在 validation 集上扫描 KGW 固定偏置与 \cakl{} 预算网格，并完成 candidate-only、gate-only 和 candidate+gate 消融，根据预设规则选择完整方法参数；
+    \item 固定模型、采样参数、方法工作点、检测器配置和随机种子，在独立测试集的 500 条 prompt 上以三组基础随机种子生成全部比较文本；
     \item 对冻结的 test 输出统一计算 standard/matched detector、corpus PPL 与 SimCSE，并使用 2,000 次 prompt-cluster bootstrap 估计 95\% 置信区间。
 \end{enumerate}
 
@@ -238,9 +238,9 @@ KGW 水印通过固定 logit 偏置提高 green token 的采样概率，其检�
 
 \subsection{Validation 集上的参数选择}
 
-Validation 集上的完整网格表明，KGW 和 \cakl{} 均覆盖从约 30\% TPR 到接近饱和的弱、中、强水印区间。\cakl{} $\varepsilon=0.10$ 取得 97.6\% standard \tpr{}，SimCSE 为 0.6790，位于预注册的 95--98\% operating range，因而被选为 candidate/gate 消融的基础工作点；其余 epsilon 用于构建完整参数曲线。
+Validation 集上的完整网格表明，KGW 和 \cakl{} 均覆盖从约 30\% TPR 到接近饱和的弱、中、强水印区间。\cakl{} $\varepsilon=0.10$ 取得 97.6\% standard \tpr{}，SimCSE 为 0.6790，位于 95--98\% 的目标检测率范围内，因而被选为候选集合与置信门控消融的基础工作点；其余 $\varepsilon$ 取值用于构建完整参数曲线。
 
-Candidate-only 的 top-p=0.90、0.95、0.99 在 matched weighted-global detector 下的 validation TPR 分别为 99.0\%、99.2\%、98.8\%，对应 SimCSE 为 0.6842、0.6853、0.6781；因此选择 0.95。Gate-only 依据 No-Watermark validation 分布构造约 90\%、75\%、50\% 三种覆盖率。最终 candidate+gate 对比见表~\ref{tab:gate-selection}，按“先最大化 clean weighted-global \tpr{}，再比较 SimCSE”的规则选中 90\% gate。
+Candidate-only 的 top-p=0.90、0.95、0.99 在 matched weighted-global detector 下的 validation TPR 分别为 99.0\%、99.2\%、98.8\%，对应 SimCSE 为 0.6842、0.6853、0.6781；因此选择 0.95。Gate-only 依据 No-Watermark validation 分布构造约 90\%、75\%、50\% 三种覆盖率。最终 candidate+gate 对比见表~\ref{tab:gate-selection}，按“先最大化未攻击场景下的 weighted-global \tpr{}，再比较 SimCSE”的规则选中 90\% gate。
 
 \begin{table}[H]
     \centering
@@ -258,13 +258,13 @@ Candidate-only 的 top-p=0.90、0.95、0.99 在 matched weighted-global detector
     \end{tabular}
 \end{table}
 
-90\% gate 的冻结阈值为 normalized entropy $H_{\min}=0.0067067$、top-1 probability $p_{\max}=0.9793311$。同时冻结 matched fixed-delta control：KGW $\delta=1.5$ 加相同 candidate top-p 与 gate。这样可区分动态 KL 与 candidate/gate、detector 本身的贡献。
+90\% gate 的冻结阈值为 normalized entropy $H_{\min}=0.0067067$、top-1 probability $p_{\max}=0.9793311$。同时冻结匹配的固定偏置对照：KGW $\delta=1.5$ 加相同 candidate top-p 与 gate。这样可区分动态 KL 与 candidate/gate、detector 本身的贡献。
 
 \subsection{独立测试集上的 KGW 与 CA-KL}
 
-Huo 等人的 token-specific watermarking 将 detectability 与 semantic coherence 作为联合优化目标，强调水印方法不能只用单一强度下的检测率判断，而应观察不同水印强度形成的检测--质量折中曲线~\cite{huo2024token}。受此评价方式启发，本文将 KGW fixed-delta 与 \cakl{} epsilon 扫描都视为一组 operating points：散点表示冻结 test 输出的实测结果，平滑曲线仅用于展示同一方法族内部随水印强度变化的趋势，不作为新的实验观测。
+Huo 等人的逐 token 水印研究将可检测性与语义一致性作为联合优化目标，强调水印方法不能只用单一强度下的检测率判断，而应观察不同水印强度形成的检测--质量折中曲线~\cite{huo2024token}。受此评价方式启发，本文将 KGW 固定偏置与 \cakl{} 预算扫描都视为一组工作点：散点表示独立测试集输出的实测结果，平滑曲线仅用于展示同一方法族内部随水印强度变化的趋势，不作为新的实验观测。
 
-表~\ref{tab:main-test} 汇总 test-500 $\times$ 3 seeds 的 14 个主工作点。每个点的检测、SimCSE 和 PPL 样本均来自相同的 500 个 prompt；括号内为 95\% prompt-cluster bootstrap CI。
+表~\ref{tab:main-test} 汇总独立测试集三组随机种子下的 14 个主工作点。每个点的检测、SimCSE 和 PPL 样本均来自相同的 500 个 prompt；括号内为 95\% prompt-cluster bootstrap CI。
 
 \begin{longtable}{p{0.12\textwidth}p{0.12\textwidth}p{0.225\textwidth}p{0.225\textwidth}p{0.225\textwidth}}
     \caption{独立测试集主工作点：standard KGW detector、SimCSE 与 corpus PPL}\label{tab:main-test}                  \\
@@ -298,9 +298,9 @@ Huo 等人的 token-specific watermarking 将 detectability 与 semantic coheren
     \cakl{} & $\varepsilon=0.50$ & 99.53\% [98.93,99.93] & 0.6566 [0.6484,0.6645] & 34.14 [32.91,35.43] \\
 \end{longtable}
 
-在弱水印端，KGW $\delta=0.5$ 与 \cakl{} $\varepsilon=0.02$ 的 TPR 接近（30.20\% 对 29.67\%），前者同时具有略高 SimCSE 和略低 PPL。在中等工作点，\cakl{} $\varepsilon=0.10$ 相比 KGW $\delta=1.0$ 的 TPR 高 2.53 个百分点，但 SimCSE 低 0.0026、corpus PPL 高 1.28；相比 KGW $\delta=1.5$，其质量更好但 TPR 低 3.93 个百分点。这说明 \cakl{} 的改进不表现为单个点全面支配 KGW，而表现为用 $\varepsilon$ 给出更细粒度、可解释的 token-specific 强度调节，使检测率可以沿连续预算曲线逐步提高。
+在弱水印端，KGW $\delta=0.5$ 与 \cakl{} $\varepsilon=0.02$ 的 TPR 接近（30.20\% 对 29.67\%），前者同时具有略高 SimCSE 和略低 PPL。在中等工作点，\cakl{} $\varepsilon=0.10$ 相比 KGW $\delta=1.0$ 的 TPR 高 2.53 个百分点，但 SimCSE 低 0.0026、corpus PPL 高 1.28；相比 KGW $\delta=1.5$，其质量更好但 TPR 低 3.93 个百分点。这说明 \cakl{} 的改进不表现为单个点全面支配 KGW，而表现为用 $\varepsilon$ 给出更细粒度、可解释的逐位置强度调节，使检测率可以沿连续预算曲线逐步提高。
 
-图~\ref{fig:sim-pareto} 聚焦 SimCSE $\leq0.69$、TPR 介于 0.94--1.00 的高检测区，以观察饱和区附近的 detectability--semantic coherence 前沿。高检测率附近，\cakl{} 的平滑趋势线与 KGW 曲线交错而非整体落后：例如 \cakl{} $\varepsilon=0.30$ 与 KGW $\delta=2.0$ 的 TPR 均为 99.33\%，但 SimCSE 分别为 0.6692 与 0.6636，前者高 0.0056；\cakl{} $\varepsilon=0.20$ 也在接近 98.8\% TPR 时保持 0.6752 的 SimCSE。该结果与 Huo 等人强调的 token-specific 折中视角一致，即改进重点在于按位置调节嵌入强度，而不是把所有位置推向同一个固定偏置。
+图~\ref{fig:sim-pareto} 聚焦 SimCSE $\leq0.69$、TPR 介于 0.94--1.00 的高检测区，以观察饱和区附近的检测率--语义一致性前沿。高检测率附近，\cakl{} 的平滑趋势线与 KGW 曲线交错而非整体落后：例如 \cakl{} $\varepsilon=0.30$ 与 KGW $\delta=2.0$ 的 TPR 均为 99.33\%，但 SimCSE 分别为 0.6692 与 0.6636，前者高 0.0056；\cakl{} $\varepsilon=0.20$ 也在接近 98.8\% TPR 时保持 0.6752 的 SimCSE。该结果与 Huo 等人强调的逐 token 折中视角一致，即改进重点在于按位置调节嵌入强度，而不是把所有位置推向同一个固定偏置。
 
 \begin{figure}[H]
     \centering
@@ -318,11 +318,11 @@ Huo 等人的 token-specific watermarking 将 detectability 与 semantic coheren
     \label{fig:ppl-pareto}
 \end{figure}
 
-综合 SimCSE 与 PPL，\cakl{} 在当前协议下相对 KGW 的改进可以概括为两点。第一，固定 $\delta$ 被逐 token KL 预算 $\varepsilon$ 取代，水印强度从经验偏置转化为可解释的分布约束，参数扫描形成更连续的折中曲线。第二，在部分高检测工作点，\cakl{} 可以在相同或接近的 TPR 下获得更高 SimCSE，例如 99.33\% TPR 处相对 KGW $\delta=2.0$ 的提升。与此同时，PPL 曲线与 KGW 仍有交错，bootstrap 区间也存在重叠，因此本文不宣称 \cakl{} 在 clean 条件下严格支配 KGW fixed-delta 包络，而将其定位为一种更可控的 token-specific 水印强度分配方法。
+综合 SimCSE 与 PPL，\cakl{} 在当前协议下相对 KGW 的改进可以概括为两点。第一，固定 $\delta$ 被逐 token KL 预算 $\varepsilon$ 取代，水印强度从经验偏置转化为可解释的分布约束，参数扫描形成更连续的折中曲线。第二，在部分高检测工作点，\cakl{} 可以在相同或接近的 TPR 下获得更高 SimCSE，例如 99.33\% TPR 处相对 KGW $\delta=2.0$ 的提升。与此同时，PPL 曲线与 KGW 仍有交错，bootstrap 区间也存在重叠，因此本文不宣称 \cakl{} 在未攻击条件下严格优于 KGW 固定偏置包络，而将其定位为一种更可控的逐 token 水印强度分配方法。
 
 \subsection{完整方法与匹配检测}
 
-根据 validation 结果，\caklcg{} 采用 $\varepsilon=0.10$、candidate top-p=0.95 和 90\% gate；其 test 实际 gate pass rate 为 88.94\%，平均 candidate size 为 298.2。matched fixed-delta control 使用 $\delta=1.5$ 和相同 candidate/gate，实际 gate pass rate 为 89.01\%。表~\ref{tab:matched} 展示 clean test 结果。
+根据 validation 结果，\caklcg{} 采用 $\varepsilon=0.10$、candidate top-p=0.95 和 90\% gate；其独立测试集实际 gate pass rate 为 88.94\%，平均 candidate size 为 298.2。匹配的固定偏置对照使用 $\delta=1.5$ 和相同候选集合/门控配置，实际 gate pass rate 为 89.01\%。表~\ref{tab:matched} 展示未攻击测试集结果。
 
 \begin{table}[H]
     \centering
@@ -344,25 +344,25 @@ Huo 等人的 token-specific watermarking 将 detectability 与 semantic coheren
     \end{tabularx}
 \end{table}
 
-\caklcg{} 的 standard TPR 为 86.40\%，低于 \cakl{} base $\varepsilon=0.10$ 的 94.80\%。由于 standard detector 未重建 candidate 支持集与 gate，该差异反映的是生成--检测配置失配，而非水印证据的完全消失。matched weighted-global 达到 97.80\%，比 standard 高 11.40 个百分点，验证了检测配置匹配的必要性。Weighted-WinMax 在 clean 全文上的 TPR 低于 global；独立阈值校准控制了窗口搜索的多重比较效应，说明局部窗口聚合在全文水印场景中不必然提高检测功效。
+\caklcg{} 的 standard TPR 为 86.40\%，低于 \cakl{} base $\varepsilon=0.10$ 的 94.80\%。由于 standard detector 未重建 candidate 支持集与 gate，该差异反映的是生成--检测配置失配，而非水印证据的完全消失。matched weighted-global 达到 97.80\%，比 standard 高 11.40 个百分点，验证了检测配置匹配的必要性。Weighted-WinMax 在未攻击全文上的 TPR 低于 global；独立阈值校准控制了窗口搜索的多重比较效应，说明局部窗口聚合在全文水印场景中不必然提高检测功效。
 
 与 matched KGW-CG 对照相比，\caklcg{} 的 SimCSE 高 0.0077，但 TPR 低 1.0 个百分点、corpus PPL 高 0.61，因此不存在单方面支配。该对照将完整系统的效应分解为动态 KL、candidate/gate 和 detector 三部分，避免将检测器增益直接归因于生成算法。
 
 \section{总结}
 
-本文从 KGW 复现出发，研究逐 token KL 约束水印及其 candidate/gate 扩展。实验采用结构化数据划分、全词表 greenlist、精确 continuation token 计分、检测器配置配对与 held-out 阈值校准；validation/test 各 500 条固定数据、三个 test seeds 和完整参数网格共同保证结果可比较。
+本文围绕大语言模型生成文本的统计水印检测问题，完成了 KGW 方法的复现，并在统一实验协议下研究逐位置 KL 约束水印及其候选集合、置信门控扩展。实验将参数选择与最终评测严格分离，对生成文本的来源检测率、语义一致性和语言流畅性进行联合评价，使不同水印配置能够在同一尺度下比较。
 
-test-500 $\times$ 3 seeds 表明，\cakl{} $\varepsilon=0.10$ 达到 94.80\% \tpr{}、0.6875 SimCSE 和 25.25 corpus PPL。该点与 KGW 包络接近，但不足以支持严格 Pareto 改进。完整方法 \caklcg{} 在 matched weighted-global detector 下达到 97.80\% TPR，明显高于其 standard 诊断值 86.40\%，证明匹配检测是 candidate/gate 系统不可缺少的组成部分。
+实验结果表明，逐位置 KL 预算能够以可解释的分布约束调节水印强度，并形成连续的检测--质量折中。在 $\varepsilon=0.10$ 的代表性设置下，\cakl{} 达到 94.80\% \tpr{}、0.6875 SimCSE 和 25.25 corpus PPL，表现与 KGW 固定偏置方法接近；当预算继续增大时，检测率进一步提升，但语义相似度和困惑度会出现相应损失。因此，该方法的主要价值不在于单点上完全取代 KGW，而在于提供了更明确的扰动预算和更细粒度的工作点选择。
 
-因此，实验结果不支持 \cakl{} 在 clean 条件下全面优于 KGW，但支持以下方法贡献：逐 token KL 预算把水印强度转化为具有明确分布意义的约束；candidate/gate 与 matched detector 构成了清晰的联合生成--检测系统。上述结论由独立测试集上的检测率、SimCSE 与 corpus PPL 共同支持。
+此外，完整方法的结果说明，候选集合约束和置信门控虽然能够使水印嵌入更贴合当前采样分布，但也要求检测端同步建模相同的有效位置和统计权重。匹配 weighted-global 检测器将完整方法的 TPR 从标准检测下的 86.40\% 提升至 97.80\%，证明生成机制与检测统计的一致性直接影响最终检测能力。综合来看，本文的实验支持以下结论：KGW 水印具有稳定的可复现性；逐位置 KL 约束提供了更可控的水印强度调节方式；面向改进水印流程时，检测器设计应与生成阶段的约束共同考虑。
 
 \section{实验分工}
 
 \noindent\textbf{施煌：}负责 KGW 原论文阅读、官方仓库复现、C4 数据流程核对，以及报告中方法背景与复现部分的整理。
 
-\noindent\textbf{祖裕柏：}负责本文改进水印生成端的主要实现与实验执行。具体包括在 KGW logits processor 基础上实现 \cakl{} 逐位置 KL 预算求解，将固定 $\delta$ 改为按当前位置分布自适应选择的 $\delta_t$；设计并实现 candidate-aware greenlist，使水印划分限制在当前 top-p 候选集合内；实现基于 entropy/top-1 条件的 confidence gate，控制哪些生成位置参与嵌入；编写批量生成脚本，完成 KGW fixed-delta、\cakl{} epsilon 网格、candidate-only、gate-only 与 candidate+gate 等方法的 validation 参数扫描和 test 集独立生成，并整理生成结果、运行日志与实验配置。
+\noindent\textbf{祖裕柏：}负责改进水印生成端的实现与实验执行。主要包括在 KGW logits processor 基础上实现 \cakl{} 逐位置 KL 预算求解，将固定 $\delta$ 改为按当前位置分布自适应选择的 $\delta_t$；实现 candidate-aware greenlist 与基于 entropy/top-1 条件的 confidence gate；编写批量生成脚本，完成 KGW、\cakl{} 参数网格以及 candidate/gate 相关方法的 validation 扫描和 test 集生成，并整理实验配置、运行日志与生成结果。
 
-\noindent\textbf{黄镇邦：}负责检测端、离线评测与结果分析的主要工作。具体包括实现 standard KGW detector 以及与 candidate/gate 配置一致的 matched weighted-global、matched weighted-winmax detector；设计 validation human completions 上的低 FPR 阈值校准流程，并在 test human completions 上核对实际误报率；完成 continuation-only corpus PPL 与 prompt/seed 配对 SimCSE 评测，保证质量指标只作用于生成 continuation；编写 prompt-cluster bootstrap 统计脚本，估计 TPR、SimCSE 与 PPL 的 95\% 置信区间；绘制检测率--语义一致性、检测率--PPL 折中曲线和完整方法对比表，并负责报告中实验结果、统计解释和结论边界的撰写。
+\noindent\textbf{黄镇邦：}负责检测端、离线评测与结果分析。主要包括实现 standard KGW detector 以及与 candidate/gate 配置一致的 matched weighted-global、matched weighted-winmax detector；设计低 FPR 阈值校准流程并核对独立测试集误报率；完成 continuation-only corpus PPL、prompt/seed 配对 SimCSE 与 prompt-cluster bootstrap 统计；绘制检测率--语义一致性、检测率--PPL 折中曲线和完整方法对比表，并撰写实验结果分析与结论边界。
 
 \clearpage
 \bibliographystyle{ieeetr}
